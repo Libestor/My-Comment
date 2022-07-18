@@ -1,7 +1,7 @@
 package main
 
 import (
-	"cobalt.Strike/cobalt.tcp"
+	"My-Comment/cobalt.tcp"
 	"fmt"
 	"os/exec"
 	"runtime"
@@ -96,10 +96,12 @@ func ChangeHost() {
 	//exec.Command("clear")            // 清除屏幕
 	//ipChanMap[contralId-1].SetHost() // 设置这个客户机
 
-	hostss := ipChanMap[contralId-1]
-	SetHost(&hostss)
+	hosts := ipChanMap[contralId-1]
+	hostss := hosts.Getpoint()
+
+	SetHost(hostss)
 	fmt.Printf("完成一次赋值")
-	ipChanMap[contralId-1] = hostss
+	//ipChanMap[contralId-1] = hostss
 
 }
 

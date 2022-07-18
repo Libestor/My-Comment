@@ -1,9 +1,9 @@
 package cobalt_tcp
 
 import (
+	cobalt_crypto "My-Comment/cobalt.crypto"
 	"bufio"
 	"bytes"
-	cobalt_crypto "cobalt.Strike/cobalt.crypto"
 	"fmt"
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
@@ -90,7 +90,9 @@ func (_ HOSTS) Listener(listener net.Listener, ipchan map[int]HOSTS) {
 
 	}
 }
-
+func (hosts *HOSTS) Getpoint() *HOSTS {
+	return hosts
+}
 func PutMsgs(conn net.Conn, cmd *HOSTS) {
 	// 用于向客户端发送请求的函数
 	regstringCmd := "\\ACmd\\r\\n"
