@@ -3,10 +3,7 @@ package cobalt_tcp
 import (
 	cobalt_crypto "My-Comment/cobalt.crypto"
 	"bufio"
-	"bytes"
 	"fmt"
-	"golang.org/x/text/encoding/simplifiedchinese"
-	"golang.org/x/text/transform"
 	"io/ioutil"
 	"log"
 	"net"
@@ -17,7 +14,7 @@ import (
 	"time"
 )
 
-var DEBUG bool = true
+var DEBUG bool = false
 var Computer = runtime.GOOS //
 var MaxConnect = 30         // 定义最大连接数量
 var MaxChanSize = 10        //默认每个命令通道的大小
@@ -48,7 +45,7 @@ func (hosts *HOSTS) UseCmd() {
 	for {
 		fmt.Printf(">")
 		a, _ := reader.ReadString('\n')
-		if a == "quit\r\n" {
+		if strings.Index(a, "quit") == 0 {
 			break
 		}
 		if DEBUG {
@@ -270,7 +267,7 @@ func (hosts *HOSTS) FileDeal() {
 			} else {
 				abslsentPath = abslsentPath + "/" + relativePath
 			}
-			path := "Documentcd " + abslsentPath
+			path := "Documentdir " + abslsentPath
 			if DEBUG {
 				fmt.Printf("path:%s\n", path)
 			}
@@ -319,9 +316,10 @@ func (hosts *HOSTS) GetMsg(conn net.Conn) {
 			log.Println(err1)
 			return
 		}
-
 		//b, err2 := SocketToUtf8(GetMsg[:n1])
 		b, err2 := cobalt_crypto.Decode(GetMsg[:n1]) // 解码位置
+		//b := string(GetMsg[:n1])
+		//var err2 error = nil
 		if err2 != nil {
 			fmt.Printf("转换失败：\n")
 			log.Println(err2)
@@ -342,15 +340,12 @@ func (hosts *HOSTS) GetMsg(conn net.Conn) {
 			if DEBUG {
 				fmt.Printf("收到消息\n")
 			}
-			//加密位置
-			//data, _ := ioutil.ReadAll(transform.NewReader(bytes.NewReader(GetMsg), simplifiedchinese.GBK.NewEncoder()))
-			//dd := []rune(b)
 
-			fmt.Printf("%s", GetMsg)
+			fmt.Printf("%s", b)
 
 			fmt.Printf("\n")
 			if DEBUG {
-				fmt.Printf("data 打印完毕")
+				//fmt.Printf("data 打印完毕")
 			}
 			hosts.Time = time.Now().Format("01-02 15:04:05")
 		}
@@ -359,12 +354,4 @@ func (hosts *HOSTS) GetMsg(conn net.Conn) {
 }
 func (hosts *HOSTS) Fileput() {
 	fmt.Printf("fileput")
-}
-func SocketToUtf8(s []byte) ([]byte, error) {
-	reader := transform.NewReader(bytes.NewReader(s), simplifiedchinese.GBK.NewDecoder())
-	d, e := ioutil.ReadAll(reader)
-	if e != nil {
-		return nil, e
-	}
-	return d, nil
 }
