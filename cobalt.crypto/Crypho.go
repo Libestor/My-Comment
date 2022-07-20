@@ -14,9 +14,13 @@ func Encode(b []byte) (string, error) {
 
 	return string(b), nil
 }
-func Decode(b []byte) (string, error) {
+func DecodeToString(b []byte) (string, error) {
 	a, err := GBKToUtf8(b)
 	return string(a), err
+}
+func DecodeToByte(b []byte) ([]byte, error) {
+
+	return b, nil
 }
 
 func GBKToUtf8(s []byte) ([]byte, error) {
