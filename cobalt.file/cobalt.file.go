@@ -5,16 +5,16 @@ import (
 	"os"
 )
 
-func OpenFIle(filename string) ([]byte, string, error) {
+func OpenFIle(filename string) ([]byte, int64, error) {
 	file, err1 := os.OpenFile(filename, os.O_RDONLY, 0400)
 	if err1 != nil {
-		return nil, "", err1
+		return nil, 0, err1
 	}
 	var read_buffer = make([]byte, 100)
 	var content_buffer = make([]byte, 0)
 	fileinfo, err := file.Stat()
 	if err != nil {
-		return nil, "", err
+		return nil, 0, err
 	}
 	size := fileinfo.Size() //文件大小，单位是字节，int64
 	var length int64 = 0    //标记已经读取了多少字节的内容
@@ -23,7 +23,7 @@ func OpenFIle(filename string) ([]byte, string, error) {
 		content_buffer = append(content_buffer, read_buffer[:n]...)
 		length += int64(n)
 	}
-	return content_buffer, string(size), nil
+	return content_buffer, size, nil
 }
 func ReadFile(filename string) {
 	file, _ := os.OpenFile(filename, os.O_RDONLY, 0400)
