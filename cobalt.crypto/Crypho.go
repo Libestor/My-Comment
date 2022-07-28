@@ -7,6 +7,8 @@ import (
 	"golang.org/x/text/transform"
 	"io/ioutil"
 	"math"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -32,13 +34,13 @@ func getCnum() {
 	for m3/int(math.Pow(10, float64(con3))) > 0 {
 		con3++
 	}
-	c1 = con1*1000 + con1*100 + con1*10 + con1
-	c2 = con2*1000 + con2*100 + con2*10 + con2
-	c3 = con3*1000 + con3*100 + con3*10 + con3
+	c1 = con1*10 + con1
+	c2 = con2*10 + con2
+	c3 = con3*10 + con3
 }
 func EncodeString(s string) (string, error) {
 	getCnum()
-	r := []rune(string(s))
+	r := []rune(s)
 	newB := runeEncode(r)
 	return string(newB), nil
 }
@@ -49,32 +51,54 @@ func EncodeByte(b []byte) ([]byte, error) {
 	return []byte(string(newB)), nil
 	//return b, nil
 }
-func DecodeToString(b []byte) (string, error) {
+func DecodeToByte(b []byte) ([]byte, error) {
 	//Utf, _ := GBKToUtf8(b)
 	getCnum()
+	b, _ = GBKToUtf8(b)
 	r := []rune(string(b))
 	newB := runeDecode(r)
-	newByte := string(newB)
-	newByte, err1 := GBKToUtf8([]byte(newByte))
+	newByte := []byte(string(newB))
+	var err1 error = nil
+	//newByte, err1 = GBKToUtf8([]byte(newByte))
+	//newByte, err1 = zhToUnicode(newByte)
+	//newByte, err1 = GBKToUtf8(newByte)
+	//newByte, _ = UTF8ToGBK(newByte)
 	return newByte, err1
 
 }
-func DecodeToByte(b []byte) ([]byte, error) {
-	c, err := DecodeToString(b)
+func DecodeToString(b []byte) (string, error) {
+	//b, _ = GBKToUtf8(b)
+	c, err := DecodeToByte(b)
 	if err != nil {
-		return []byte(""), err
+		return "", err
 	}
-	return []byte(c), err
+	return string(c), err
 }
 
-func GBKToUtf8(s []byte) (string, error) {
+func GBKToUtf8(s []byte) ([]byte, error) {
 	reader := transform.NewReader(bytes.NewReader(s), simplifiedchinese.GBK.NewDecoder())
 	d, e := ioutil.ReadAll(reader)
 	if e != nil {
-		return string(d), e
+		return d, e
 	}
 
-	return string(d), nil
+	return d, nil
+}
+func UTF8ToGBK(s []byte) ([]byte, error) {
+	reader := transform.NewReader(bytes.NewReader(s), simplifiedchinese.GBK.NewEncoder())
+	d, e := ioutil.ReadAll(reader)
+	if e != nil {
+		return d, e
+	}
+
+	return d, nil
+}
+func zhToUnicode(raw []byte) ([]byte, error) {
+	str, err := strconv.Unquote(strings.Replace(strconv.Quote(string(raw)), `\\u`, `\u`, -1))
+	if err != nil {
+		return nil, err
+	}
+	return []byte(str), nil
 }
 func qer() {
 	a := "中文字符"

