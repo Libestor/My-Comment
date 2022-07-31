@@ -145,17 +145,7 @@ func zhToUnicode(raw []byte) ([]byte, error) {
 	}
 	return []byte(str), nil
 }
-func qer() {
-	a := "中文字符"
-	b := []rune(a)
-	fmt.Println(b)
-	var c []rune
-	for _, j := range b {
-		j += 2
-		c = append(c, j)
-		fmt.Println(j)
-	}
-}
+
 func runeDecode(old []rune) []rune {
 
 	for i := 0; i < len(old); i++ {

@@ -68,7 +68,7 @@ func menu() {
 	for i := 1; i <= len(cobalt_tcp.IpChanMap); i++ {
 		//ipChanMap[i].PrintHost(i - 1)
 		hosts := cobalt_tcp.IpChanMap[i]
-		fmt.Printf("%d\t%s\t%s\t\t%s\t %s\n", i, hosts.Ip, hosts.Time,
+		fmt.Printf("%d\t%s\t%s\t\t%s\t %s\n", i, hosts.Ip, hosts.Time.TimeString,
 			time.Now().Format("01-02 15:04:05"), hosts.Living)
 	}
 	if len(cobalt_tcp.IpChanMap) == 0 {
@@ -77,8 +77,8 @@ func menu() {
 		return
 	}
 
-	if cobalt_tcp.Computer == "windows" {
-		fmt.Scanf("%s", &num)
+	if cobalt_tcp.Computer == "Windows" {
+		fmt.Scanf("%d", &num)
 	}
 	for {
 		n, err := fmt.Scanf("%d", &num)
@@ -115,9 +115,9 @@ func ServerSet() {
 		fmt.Printf("2.当前按照ip地址加端口区分主机\n")
 	}
 	var num int
-	if cobalt_tcp.Computer == "windows" {
-		fmt.Scanf("%d", &num)
-	}
+	//if cobalt_tcp.Computer == "windows" {
+	//	fmt.Scanf("%d", &num)
+	//}
 	for {
 		n, err := fmt.Scanf("%d", &num)
 		if n != 1 || err != nil {
@@ -152,7 +152,7 @@ func SelectHost() {
 	for i := 1; i <= len(cobalt_tcp.IpChanMap); i++ {
 		fmt.Printf("%d\t%s\n", i, cobalt_tcp.IpChanMap[i].Ip)
 	}
-	if cobalt_tcp.Computer == "windows" {
+	if cobalt_tcp.Computer == "Windows" {
 		fmt.Scanf("%s", &contralId)
 	}
 	for {
@@ -179,7 +179,7 @@ func SetHost(hosts cobalt_tcp.HOSTS, id int) {
 
 	var num int
 	fmt.Printf("主机名\t主机ip\t主机最后一次心跳时间\t当前时间\t心跳时间\t\n")
-	fmt.Printf("%s\t%s\t\t%s\t%s\t%s\n", hosts.Whoami, hosts.Ip, hosts.Time,
+	fmt.Printf("%s\t%s\t\t%s\t%s\t%s\n", hosts.Whoami, hosts.Ip, hosts.Time.TimeString,
 		time.Now().Format("01-02 15:04:05"), hosts.Living)
 	fmt.Printf("1. 刷新\n")
 	fmt.Printf("2. 主机信息搜集\n")
@@ -191,7 +191,7 @@ func SetHost(hosts cobalt_tcp.HOSTS, id int) {
 	//fmt.Printf("7. 刷新\n")
 	fmt.Printf("按0返回主界面\n")
 	fmt.Printf("\n请输入选项:  ")
-	if Computer == "windows" {
+	if Computer == "Windows" {
 		fmt.Scanf("%s", &num)
 	}
 	for {
@@ -247,7 +247,7 @@ func ViewHost(hosts cobalt_tcp.HOSTS, id int) {
 	//exec.Command("clear") // 清除屏幕
 	var num int
 	fmt.Printf("主机名\t主机ip\t主机最后一次心跳时间\t当前时间\t心跳时间\t\n")
-	fmt.Printf("%s\t%s\t\t%s\t%s\t%s\n", hosts.Whoami, hosts.Ip, hosts.Time,
+	fmt.Printf("%s\t%s\t\t%s\t%s\t%s\n", hosts.Whoami, hosts.Ip, hosts.Time.TimeString,
 		time.Now().Format("01-02 15:04:05"), hosts.Living)
 	fmt.Printf("1.刷新\n")
 	fmt.Printf("2. 进程查看\n")     //wmic process list brief
@@ -258,7 +258,7 @@ func ViewHost(hosts cobalt_tcp.HOSTS, id int) {
 	fmt.Printf("7. 查看本机服务\n")   //wmic service list brief
 	fmt.Printf("0. 返回上一层\n")
 	fmt.Printf("\n请输入选项:  ")
-	if Computer == "windows" {
+	if Computer == "Windows" {
 		fmt.Scanf("%s", &num)
 	}
 	for {
@@ -309,7 +309,7 @@ func ViewHost(hosts cobalt_tcp.HOSTS, id int) {
 func ViewDemain(hosts cobalt_tcp.HOSTS, id int) {
 	var num int
 	fmt.Printf("主机名\t主机ip\t主机最后一次心跳时间\t当前时间\t心跳时间\t\n")
-	fmt.Printf("%s\t%s\t\t%s\t%s\t%s\n", hosts.Whoami, hosts.Ip, hosts.Time,
+	fmt.Printf("%s\t%s\t\t%s\t%s\t%s\n", hosts.Whoami, hosts.Ip, hosts.Time.TimeString,
 		time.Now().Format("01-02 15:04:05"), hosts.Living)
 	fmt.Printf("1.刷新\n")
 	fmt.Printf("1. 查看域的名字\n")     //net config workstation
@@ -319,7 +319,7 @@ func ViewDemain(hosts cobalt_tcp.HOSTS, id int) {
 	fmt.Printf("5. 查看机器所属那个域\n")  //net config Workstation
 	fmt.Printf("0. 返回上一层\n")
 	fmt.Printf("\n请输入选项:  ")
-	if Computer == "windows" {
+	if Computer == "Windows" {
 		fmt.Scanf("%s", &num)
 	}
 	for {

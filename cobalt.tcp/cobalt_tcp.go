@@ -23,10 +23,16 @@ var MaxConnect = 30         // 定义最大连接数量
 var MaxChanSize = 10        //默认每个命令通道的大小
 var MaxMagString = 50000    //默认每次接受命令的大小
 
+type TimeInfo struct {
+	TimeString string
+	Living     chan bool
+	flags      bool
+	Time       time.Time
+}
 type HOSTS struct {
 	Ip            string
 	Chans         chan string
-	Time          string
+	Time          TimeInfo
 	Living        string
 	ChansFileName chan string
 	Whoami        string
@@ -145,9 +151,10 @@ func PutMsgs(conn net.Conn, cmd int) {
 				}
 				return
 			}
-
+			//LivingCharge(cmd) //改变时间
 			temp := IpChanMap[cmd]
-			temp.Time = time.Now().Format("01-02 15:04:05")
+			temp.Time.TimeString = time.Now().Format("01-02 15:04:05")
+			temp.Time.Time = time.Now()
 			IpChanMap[cmd] = temp
 		} else if reg.FindString(Sends) == "Document" {
 			cobalt_file.MemUser([]byte(Sends))
@@ -177,9 +184,9 @@ func PutMsgs(conn net.Conn, cmd int) {
 				}
 				return
 			}
-
+			//LivingCharge(cmd)
 			temp := IpChanMap[cmd]
-			temp.Time = time.Now().Format("01-02 15:04:05")
+			temp.Time.TimeString = time.Now().Format("01-02 15:04:05")
 			IpChanMap[cmd] = temp
 
 		} else {
@@ -223,13 +230,19 @@ func addIp(ip string) (*HOSTS, int) {
 		Chans := make(chan string, MaxChanSize)
 		chansBack := make(chan string, MaxChanSize)
 		chansBack2 := make(chan string)
+		Time1 := make(chan bool)
 		Chans <- "Cmd\r\nwhoami"
 		Chans <- "DocumentDisk\r\n"
-
+		var Time = TimeInfo{
+			time.Now().Format("01-02 15:04:05"),
+			Time1,
+			false,
+			time.Now(),
+		}
 		temp_host := HOSTS{
 			ip,
 			Chans,
-			time.Now().Format("01-02 15:04:05"),
+			Time,
 			"60s",
 			chansBack,
 			"",
@@ -247,7 +260,7 @@ func addIp(ip string) (*HOSTS, int) {
 }
 
 func (hosts HOSTS) PrintHost(i int) {
-	fmt.Printf("%d\t%s\t%s\t\t%s\t %s\n", i+1, hosts.Ip, hosts.Time,
+	fmt.Printf("%d\t%s\t%s\t\t%s\t %s\n", i+1, hosts.Ip, hosts.Time.TimeString,
 		time.Now().Format("01-02 15:04:05"), hosts.Living)
 }
 
@@ -368,8 +381,9 @@ func DealMags(GetMsgs string, hosts int, orgin []byte) {
 		if DEBUG {
 			fmt.Printf("收到心跳包")
 		}
+		//LivingCharge(hosts)
 		temp := IpChanMap[hosts]
-		temp.Time = time.Now().Format("01-02 15:04:05")
+		temp.Time.TimeString = time.Now().Format("01-02 15:04:05")
 		IpChanMap[hosts] = temp
 	} else if reg.FindString(GetMsgs) == "Document\r\n" {
 		num := strings.Index(GetMsgs, "Document")
@@ -432,7 +446,17 @@ func DealMags(GetMsgs string, hosts int, orgin []byte) {
 
 			}
 		}
-		temp.Time = time.Now().Format("01-02 15:04:05")
+		//temp := IpChanMap[id]
+		// 判断是否有协程正在运行
+
+		//if temp.Time.flags { // 如果有协程
+		//	temp.Time.Living <- true // 有心跳，停止
+		//}
+		////新的协程
+		//temp.Time.Time = time.Now()           //设置新时间
+		//temp.Time.LivingOrNot(temp.Ip, hosts) //启动协程
+
+		temp.Time.TimeString = time.Now().Format("01-02 15:04:05")
 		IpChanMap[hosts] = temp
 
 	} else {
@@ -448,8 +472,9 @@ func DealMags(GetMsgs string, hosts int, orgin []byte) {
 		if DEBUG {
 			//fmt.Printf("data 打印完毕")
 		}
+		//LivingCharge(hosts)
 		temp := IpChanMap[hosts]
-		temp.Time = time.Now().Format("01-02 15:04:05")
+		temp.Time.TimeString = time.Now().Format("01-02 15:04:05")
 		IpChanMap[hosts] = temp
 	}
 
@@ -476,6 +501,37 @@ func SwicheSet(msg int) {
 			OpenIpSwitch(false)
 		} else {
 			OpenIpSwitch(true)
+		}
+	}
+}
+func LivingCharge(id int) {
+	fmt.Println(id)
+	var temp = IpChanMap[id]
+	//runtime.KeepAlive(temp)
+	//temp := IpChanMap[id]
+	// 判断是否有协程正在运行
+	if temp.Time.flags { // 如果有协程
+		temp.Time.Living <- true // 有心跳，停止
+	}
+	//新的协程
+	temp.Time.Time = time.Now()        //设置新时间
+	temp.Time.LivingOrNot(temp.Ip, id) //启动协程
+	temp.Time.flags = true
+	IpChanMap[id] = temp //重新赋值
+
+}
+func (i TimeInfo) LivingOrNot(ip string, id int) { //检测函数
+	for {
+		if <-i.Living { //如果收到了心跳，就是真
+			return
+		}
+		d := time.Now().Sub(i.Time)
+		if d >= 60 {
+			fmt.Printf("%s未在规定时间通信，疑似下线\n", ip)
+			temp := IpChanMap[id]
+			temp.Time.flags = false
+			IpChanMap[id] = temp
+			return
 		}
 	}
 }
