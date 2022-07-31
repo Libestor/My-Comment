@@ -1,7 +1,9 @@
 package cobalt_crypto
 
 import (
+	cobalt_file "My-Comment/cobalt.file"
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
@@ -12,6 +14,7 @@ import (
 	"time"
 )
 
+var DEBUG bool = false
 var c1 int32
 var c2 int32
 var c3 int32
@@ -40,42 +43,84 @@ func getCnum() {
 }
 func EncodeString(s string) (string, error) {
 	getCnum()
+	s = base64.StdEncoding.EncodeToString([]byte(s)) // base64加密
 	r := []rune(s)
 	newB := runeEncode(r)
 	return string(newB), nil
 }
 func EncodeByte(b []byte) ([]byte, error) {
 	getCnum()
-	r := []rune(string(b))
+	dis := make([]byte, base64.StdEncoding.EncodedLen(len(b)))
+	if len(b) <= 2 {
+		return []byte(""), nil
+	}
+	base64.StdEncoding.Encode(dis, b) //base64加密
+	r := []rune(string(dis))
 	newB := runeEncode(r)
 	return []byte(string(newB)), nil
 	//return b, nil
 }
 func DecodeToByte(b []byte) ([]byte, error) {
-	//Utf, _ := GBKToUtf8(b)
 	getCnum()
-	b, _ = GBKToUtf8(b)
 	r := []rune(string(b))
 	newB := runeDecode(r)
 	newByte := []byte(string(newB))
 	var err1 error = nil
-	//newByte, err1 = GBKToUtf8([]byte(newByte))
-	//newByte, err1 = zhToUnicode(newByte)
-	//newByte, err1 = GBKToUtf8(newByte)
-	//newByte, _ = UTF8ToGBK(newByte)
-	return newByte, err1
+	//var b []byte = '15'
+
+	newByte = bytes.Trim(newByte, "\r")
+	newByte = bytes.Trim(newByte, "\n")
+	newByte = bytes.Trim(newByte, " ")
+	newByte = bytes.Trim(newByte, string(15))
+	if bytes.Index(newByte, []byte("!@#$^&*()_+")) != -1 {
+		num := bytes.Index(newByte, []byte("!@#$^&*()_+"))
+		B1 := newByte[:num]
+		B2 := newByte[num+11:]
+		if DEBUG {
+			fmt.Printf("分离前:")
+			fmt.Println(newByte)
+		}
+		B1, err2 := base64.StdEncoding.DecodeString(string(B1)) //base64解密
+		cobalt_file.PutErr(err2, "")
+		if DEBUG {
+			fmt.Printf("解密后B1：%s\n", B1)
+			fmt.Printf("此时B2：%s\n", B2)
+		}
+		B2, err3 := base64.StdEncoding.DecodeString(string(B2)) //base64解密
+
+		cobalt_file.PutErr(err3, "")
+		if DEBUG {
+			fmt.Printf("解密后B2：%s\n", B2)
+		}
+		B3 := bytes.Join([][]byte{B1, B2}, []byte("")) // 连接起来
+		return B3, err3
+	}
+	if DEBUG {
+		fmt.Printf("解密后未base:%s\n", newByte)
+	}
+	if DEBUG {
+		fmt.Printf(" 二进制文件：")
+		fmt.Println(newByte)
+	}
+	strs := string(newByte)
+
+	newByte1, err1 := base64.StdEncoding.DecodeString(strs) //base64解密
+
+	if DEBUG {
+		fmt.Printf("内部解密后数据：%s\n", newByte1)
+	}
+
+	return newByte1, err1
 
 }
 func DecodeToString(b []byte) (string, error) {
-	//b, _ = GBKToUtf8(b)
 	c, err := DecodeToByte(b)
-	if err != nil {
-		return "", err
-	}
+
 	return string(c), err
 }
 
 func GBKToUtf8(s []byte) ([]byte, error) {
+
 	reader := transform.NewReader(bytes.NewReader(s), simplifiedchinese.GBK.NewDecoder())
 	d, e := ioutil.ReadAll(reader)
 	if e != nil {
@@ -113,28 +158,18 @@ func qer() {
 }
 func runeDecode(old []rune) []rune {
 
-	//fmt.Println(b)
-	//var c []rune
 	for i := 0; i < len(old); i++ {
 		old[i] = coreDeCode(old[i])
 	}
-	//for _, j := range old  {
-	//	c = append(c, coreCode(j))
-	//	//fmt.Println(j)
-	//}
+
 	return old
 }
 func runeEncode(old []rune) []rune {
 
-	//fmt.Println(b)
-	//var c []rune
 	for i := 0; i < len(old); i++ {
 		old[i] = coreEncode(old[i])
 	}
-	//for _, j := range old  {
-	//	c = append(c, coreCode(j))
-	//	//fmt.Println(j)
-	//}
+
 	return old
 }
 func coreDeCode(rune2 rune) rune {
@@ -149,4 +184,7 @@ func coreEncode(rune2 rune) rune {
 	rune2 = rune2 ^ c2
 	rune2 = rune2 ^ c3
 	return rune2
+}
+func CryphoDebug(msg bool) {
+	DEBUG = msg
 }

