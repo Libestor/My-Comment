@@ -20,6 +20,22 @@
 8. 自定义通信加密
 8. 屏幕截图
 
+### 编译与运行
+
+go语言的编译有两种方式，传统方式和go.mod方式
+
+1. 在传统方式下，首先需要配置环境
+
+   1. ` go env -w GO111MODULE=auto` 或者`go env -w GO111MODULE= `off也可以
+   2. 然后我们需要将项目放到一个文件夹下，然后将此文件夹放到GOPATH目录下的src目录下，并且确保拥有库golang.org/x/text，然后在所创建文件夹下运行` go build .\control.go  `即可编译
+
+2. 使用go.mod设置环境变量 
+
+   1. `go env -w GO111MODULE=on` 或者go env -w GO111MODULE=auto
+   2. 确保有官方库 golang.org/x/text/，然后放好位置，就可以编译 `go build .\control.go`
+
+   
+
 ### 服务端的使用
 
 1. 启动客户端，然后进行初始化，之后就可以等待客户端的连接
