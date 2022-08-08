@@ -71,7 +71,12 @@ func DecodeToByte(b []byte) ([]byte, error) {
 	newByte = bytes.Trim(newByte, "\r")
 	newByte = bytes.Trim(newByte, "\n")
 	newByte = bytes.Trim(newByte, " ")
-	newByte = bytes.Trim(newByte, string(15))
+	i := 1
+	for i <= 32 {
+		newByte = bytes.Trim(newByte, string(30))
+		i++
+	}
+
 	if bytes.Index(newByte, []byte("!@#$^&*()_+")) != -1 {
 		num := bytes.Index(newByte, []byte("!@#$^&*()_+"))
 		B1 := newByte[:num]

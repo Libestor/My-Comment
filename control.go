@@ -77,7 +77,7 @@ func menu() {
 		return
 	}
 
-	if cobalt_tcp.Computer == "Windows" {
+	if cobalt_tcp.Computer == "windows" {
 		fmt.Scanf("%d", &num)
 	}
 	for {
@@ -152,7 +152,7 @@ func SelectHost() {
 	for i := 1; i <= len(cobalt_tcp.IpChanMap); i++ {
 		fmt.Printf("%d\t%s\n", i, cobalt_tcp.IpChanMap[i].Ip)
 	}
-	if cobalt_tcp.Computer == "Windows" {
+	if cobalt_tcp.Computer == "windows" {
 		fmt.Scanf("%s", &contralId)
 	}
 	for {
@@ -219,10 +219,12 @@ func SetHost(hosts cobalt_tcp.HOSTS, id int) {
 		exec.Command("clear") // 清除屏幕
 		SetHost(hosts, id)
 	case 2:
-		ViewHost(hosts, id)
+		defer ViewHost(hosts, id)
+		return
 		//defer SetHost(hosts, id)
 	case 3:
-		ViewDemain(hosts, id)
+		defer ViewDemain(hosts, id)
+		return
 		//defer SetHost(hosts, id)
 	case 4:
 		hosts.UseCmd(id)
@@ -237,6 +239,7 @@ func SetHost(hosts cobalt_tcp.HOSTS, id int) {
 		Watch(id)
 		defer SetHost(hosts, id)
 	case 0:
+
 		return
 	default:
 		defer SetHost(hosts, id)
@@ -258,7 +261,7 @@ func ViewHost(hosts cobalt_tcp.HOSTS, id int) {
 	fmt.Printf("7. 查看本机服务\n")   //wmic service list brief
 	fmt.Printf("0. 返回上一层\n")
 	fmt.Printf("\n请输入选项:  ")
-	if Computer == "Windows" {
+	if Computer == "windows" {
 		fmt.Scanf("%s", &num)
 	}
 	for {
@@ -301,7 +304,7 @@ func ViewHost(hosts cobalt_tcp.HOSTS, id int) {
 		hosts.SetCmd("wmic service list brief")
 		defer ViewHost(hosts, id)
 	case 0:
-		defer ViewHost(hosts, id)
+		return
 	default:
 		defer ViewHost(hosts, id)
 	}
@@ -312,35 +315,38 @@ func ViewDemain(hosts cobalt_tcp.HOSTS, id int) {
 	fmt.Printf("%s\t%s\t\t%s\t%s\t%s\n", hosts.Whoami, hosts.Ip, hosts.Time.TimeString,
 		time.Now().Format("01-02 15:04:05"), hosts.Living)
 	fmt.Printf("1.刷新\n")
-	fmt.Printf("1. 查看域的名字\n")     //net config workstation
-	fmt.Printf("2. 查询域列表\n")      //net view /domain
-	fmt.Printf("3. 查看所有域用户组列表\n") //net group /domain
-	fmt.Printf("4. 探测存活主机\n")     //arp -a
-	fmt.Printf("5. 查看机器所属那个域\n")  //net config Workstation
+	fmt.Printf("2. 查看域的名字\n")     //net config workstation
+	fmt.Printf("3. 查询域列表\n")      //net view /domain
+	fmt.Printf("4. 查看所有域用户组列表\n") //net group /domain
+	fmt.Printf("5. 探测存活主机\n")     //arp -a
+	fmt.Printf("6. 查看机器所属那个域\n")  //net config Workstation
 	fmt.Printf("0. 返回上一层\n")
 	fmt.Printf("\n请输入选项:  ")
-	if Computer == "Windows" {
+	if Computer == "windows" {
 		fmt.Scanf("%s", &num)
 	}
 	for {
 		okNum, err := fmt.Scanf("%d", &num)
-		if err == nil || okNum != 1 || num < 0 || num > 6 {
+		if err == nil || okNum != 1 && num > 0 && num > 6 {
 			//错误检测
 			fmt.Printf("1.刷新\n")
-			fmt.Printf("1. 查看域的名字\n")     //net config workstation
-			fmt.Printf("2. 查询域列表\n")      //net view /domain
-			fmt.Printf("3. 查看所有域用户组列表\n") //net group /domain
-			fmt.Printf("4. 探测存活主机\n")     //arp -a
-			fmt.Printf("5. 查看机器所属那个域\n")  //net config Workstation
+			fmt.Printf("2. 查看域的名字\n")     //net config workstation
+			fmt.Printf("3. 查询域列表\n")      //net view /domain
+			fmt.Printf("4. 查看所有域用户组列表\n") //net group /domain
+			fmt.Printf("5. 探测存活主机\n")     //arp -a
+			fmt.Printf("6. 查看机器所属那个域\n")  //net config Workstation
 			fmt.Printf("0. 返回上一层\n")
 			fmt.Printf("\n请输入选项:  ")
+			if num == 0 {
+				break
+			}
 			continue
 		}
 		break
 	}
 	switch num {
 	case 1:
-		defer ViewHost(hosts, id)
+		defer ViewDemain(hosts, id)
 		return
 	case 2:
 		hosts.SetCmd("net config workstation")
@@ -359,6 +365,7 @@ func ViewDemain(hosts cobalt_tcp.HOSTS, id int) {
 		defer ViewDemain(hosts, id)
 	case 0:
 		defer SetHost(hosts, id)
+		return
 	default:
 		defer ViewDemain(hosts, id)
 	}
